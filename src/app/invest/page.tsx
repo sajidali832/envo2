@@ -11,22 +11,43 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Landmark, ArrowLeft, Info } from "lucide-react";
+import { Landmark, ArrowLeft, Info, UserPlus } from "lucide-react";
 import { CopyButton } from "@/components/copy-button";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import React, { useState } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 
-export default function InvestPage() {
+function InvestContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [screenshot, setScreenshot] = useState<File | null>(null);
+  const [ref, setRef] = useState<string | null>(null);
+  const [referrerName, setReferrerName] = useState<string | null>(null);
+
+  useEffect(() => {
+    const refCode = searchParams.get('ref');
+    if (refCode) {
+      setRef(refCode);
+      const fetchReferrer = async () => {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('referral_code', refCode)
+          .single();
+        if (data) {
+          setReferrerName(data.full_name);
+        }
+      };
+      fetchReferrer();
+    }
+  }, [searchParams]);
 
   const easypaisaDetails = {
     accountName: "Envo-Earn Finance",
@@ -43,7 +64,6 @@ export default function InvestPage() {
     setLoading(true);
 
     try {
-        // 1. Upload screenshot
         const fileExt = screenshot.name.split('.').pop();
         const fileName = `${email}-${Date.now()}.${fileExt}`;
         const filePath = `screenshots/${fileName}`;
@@ -54,12 +74,10 @@ export default function InvestPage() {
 
         if (uploadError) throw uploadError;
 
-        // 2. Get public URL
         const { data: { publicUrl } } = supabase.storage
             .from('investments')
             .getPublicUrl(filePath);
 
-        // 3. Insert into investments table
         const { error: insertError } = await supabase
             .from('investments')
             .insert({
@@ -68,6 +86,7 @@ export default function InvestPage() {
                 screenshot_url: publicUrl,
                 status: 'pending',
                 email: email,
+                referred_by_code: ref,
             });
 
         if (insertError) throw insertError;
@@ -104,6 +123,16 @@ export default function InvestPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
+          {referrerName && (
+            <Alert variant="default" className="bg-primary/10 border-primary/20">
+              <UserPlus className="h-4 w-4 text-primary" />
+              <AlertTitle className="text-primary">You were referred!</AlertTitle>
+              <AlertDescription>
+                You were invited by <strong>{referrerName}</strong>.
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div>
             <h3 className="font-semibold mb-2">Step 1: Send payment via Easypaisa</h3>
             <div className="p-4 rounded-lg border bg-background space-y-4">
@@ -126,7 +155,7 @@ export default function InvestPage() {
               <Info className="h-4 w-4 text-accent" />
               <AlertTitle className="font-headline text-accent">Important!</AlertTitle>
               <AlertDescription>
-                Please ensure you send the exact amount and save a screenshot of the transaction.
+                Please send exactly <strong>6000 PKR</strong> and save a screenshot of the transaction.
               </AlertDescription>
             </Alert>
           </div>
@@ -160,4 +189,12 @@ export default function InvestPage() {
       </Card>
     </div>
   );
+}
+
+export default function InvestPage() {
+    return (
+        <Suspense fallback={<div>Loading...</div>}>
+            <InvestContent />
+        </Suspense>
+    )
 }
