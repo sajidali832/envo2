@@ -51,7 +51,6 @@ type WithdrawalHistory = {
 type Profile = {
     id: string;
     total_earnings: number;
-    // other profile fields
 }
 
 type View = 'loading' | 'setup' | 'saved';
@@ -64,7 +63,6 @@ export default function WithdrawPage() {
     const [withdrawalHistory, setWithdrawalHistory] = useState<WithdrawalHistory[]>([]);
     const [view, setView] = useState<View>('loading');
 
-    // Form states
     const [method, setMethod] = useState<'Easypaisa' | 'JazzCash' | ''>('');
     const [accountName, setAccountName] = useState('');
     const [accountNumber, setAccountNumber] = useState('');
@@ -82,7 +80,6 @@ export default function WithdrawPage() {
         }
         setUser(user);
 
-        // Fetch profile, account, and history in parallel
         const [
             { data: profileData },
             { data: accountData },
@@ -94,7 +91,7 @@ export default function WithdrawPage() {
         ]);
 
         setProfile(profileData as Profile);
-        const currentAccount = accountData ?? null;
+        const currentAccount = accountData as SavedAccount | null;
         setSavedAccount(currentAccount);
         setWithdrawalHistory(historyData as WithdrawalHistory[] ?? []);
         
@@ -108,21 +105,15 @@ export default function WithdrawPage() {
     useEffect(() => {
         fetchData();
         const channel = supabase.channel('realtime-withdrawals-user')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'withdrawals', filter: `user_id=eq.${user?.id}` }, (payload) => {
-                fetchData();
-            })
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'withdrawal_accounts', filter: `user_id=eq.${user?.id}` }, (payload) => {
-                fetchData();
-            })
-             .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${user?.id}` }, (payload) => {
-                fetchData();
-            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'withdrawals' }, fetchData)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'withdrawal_accounts' }, fetchData)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, fetchData)
             .subscribe();
 
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [user?.id]);
+    }, []);
 
     const handleSaveAccount = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -136,7 +127,7 @@ export default function WithdrawPage() {
             method,
             account_name: accountName,
             account_number: accountNumber,
-        }, { onConflict: 'user_id' }).select().single();
+        }, { onConflict: 'user_id' });
 
         if (error) {
             console.error("Save account error:", error);
@@ -220,9 +211,9 @@ export default function WithdrawPage() {
 
   return (
     <div className="flex-1 overflow-y-auto">
-        <div className="flex flex-col gap-4 p-4 sm:px-6 md:gap-8">
-            <div className="grid md:grid-cols-3 gap-8">
-                <div className="md:col-span-1 space-y-8">
+        <div className="flex flex-col gap-6 p-4 sm:px-6">
+            <div className="flex flex-col lg:flex-row gap-8">
+                <div className="w-full lg:w-1/3 space-y-6">
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
@@ -251,7 +242,7 @@ export default function WithdrawPage() {
                         </CardContent>
                     </Card>
                 </div>
-                <div className="md:col-span-2">
+                <div className="w-full lg:w-2/3">
                     {view === 'loading' && (
                         <Card>
                             <CardContent className="flex items-center justify-center h-48">
