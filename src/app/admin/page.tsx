@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,12 +13,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import AdminDashboardLayout from "./layout";
 
 const LogoIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
-        <circle cx="20" cy="20" r="20" className="fill-primary" />
-        <path d="M15.424 26V14H26V16.6H19.584V19.14H24.84V21.74H19.584V26H15.424Z" className="fill-primary-foreground" />
-    </svg>
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <circle cx="12" cy="12" r="10" className="fill-primary" />
+      <path d="M15.5 9.5L12 13L8.5 9.5" stroke="hsl(var(--primary-foreground))" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M12 13V16" stroke="hsl(var(--primary-foreground))" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M10 7H14" stroke="hsl(var(--primary-foreground))" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
 );
 
 
@@ -26,14 +29,27 @@ export default function AdminLoginPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [password, setPassword] = useState("");
+  const [isAuth, setIsAuth] = useState(false);
+
+  useEffect(() => {
+    // Check if already authenticated
+    try {
+      if (localStorage.getItem("admin_auth") === "true") {
+        setIsAuth(true);
+        router.replace("/admin/dashboard");
+      }
+    } catch (error) {
+      console.error("Could not access localStorage", error);
+    }
+  }, [router]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    // In a real app, use a secure password check.
     if (password === "Sajid092#d") {
-      // In a real app, you'd use a more secure session management.
-      // For this prototype, we'll use a simple flag in localStorage.
       try {
         localStorage.setItem("admin_auth", "true");
+        setIsAuth(true);
         router.push("/admin/dashboard");
       } catch (error) {
         console.error("Could not set item in localStorage", error);
@@ -52,6 +68,30 @@ export default function AdminLoginPage() {
     }
   };
 
+  const handleLogout = () => {
+      try {
+        localStorage.removeItem("admin_auth");
+      } catch (error) {
+        console.error("Could not remove item from localStorage", error);
+      }
+      setIsAuth(false);
+      // No need to push, just state change will re-render to the login form
+  };
+
+
+  if (isAuth) {
+    // This part should not be reached due to the redirect, but as a fallback:
+    // It renders the content within the layout if somehow the user is auth'd but on this page.
+    return (
+        <AdminDashboardLayout>
+            <div className="flex flex-col items-center justify-center h-full">
+                <p>You are logged in.</p>
+                <Button onClick={handleLogout} className="mt-4">Logout</Button>
+            </div>
+        </AdminDashboardLayout>
+    )
+  }
+
   return (
     <div className="flex items-center justify-center min-h-screen bg-secondary">
       <Card className="w-full max-w-md mx-4">
@@ -61,7 +101,7 @@ export default function AdminLoginPage() {
             </div>
           <CardTitle className="text-2xl font-headline">Admin Panel Access</CardTitle>
           <CardDescription>
-            Enter the password to manage Envo-Earn.
+            Enter the password to manage Envo Earn.
           </CardDescription>
         </CardHeader>
         <CardContent>

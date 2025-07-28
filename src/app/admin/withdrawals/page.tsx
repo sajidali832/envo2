@@ -147,7 +147,7 @@ export default function AdminWithdrawalsPage() {
 
     return (
         <>
-            <AdminDashboardHeader title="Withdrawal Requests" />
+            <AdminDashboardHeader title="Withdrawal Requests" onRefresh={fetchWithdrawals} />
             <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
                  <Card>
                     <CardHeader>

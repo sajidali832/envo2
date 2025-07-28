@@ -1,16 +1,51 @@
+
 "use client";
 
 import { AdminDashboardHeader } from "@/components/admin/admin-dashboard-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Eye, Check, X } from "lucide-react";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+
+async function processApproval(investmentId: number, newStatus: 'approved' | 'rejected', screenshotUrl: string) {
+    'use server'
+    const { supabaseAdmin } = await import('@/lib/supabaseClient');
+    if (!supabaseAdmin) throw new Error("Admin client not available");
+
+    // 1. Update investment status
+    const { error: updateError } = await supabaseAdmin
+        .from('investments')
+        .update({ status: newStatus })
+        .eq('id', investmentId);
+
+    if (updateError) {
+        throw new Error(`Failed to update status: ${updateError.message}`);
+    }
+
+    // 2. Delete screenshot from storage
+    if (screenshotUrl) {
+        try {
+            const fileName = screenshotUrl.split('/').pop();
+            if (fileName) {
+                const { error: storageError } = await supabaseAdmin.storage
+                    .from('investments')
+                    .remove([`screenshots/${fileName}`]);
+
+                if (storageError) {
+                    console.warn(`Failed to delete screenshot, but continuing: ${storageError.message}`);
+                }
+            }
+        } catch (e) {
+            console.warn(`Error parsing screenshot URL for deletion: ${e}`);
+        }
+    }
+}
+
 
 type Approval = {
     id: number;
@@ -25,9 +60,10 @@ type Approval = {
 export default function AdminApprovalsPage() {
     const [pendingApprovals, setPendingApprovals] = useState<Approval[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isPending, startTransition] = useTransition();
     const { toast } = useToast();
 
-    async function fetchApprovals() {
+    const fetchApprovals = async () => {
         setLoading(true);
         const { data, error } = await supabase
             .from('investments')
@@ -41,18 +77,18 @@ export default function AdminApprovalsPage() {
             setPendingApprovals(data as Approval[]);
         }
         setLoading(false);
-    }
+    };
 
     useEffect(() => {
         fetchApprovals();
 
         const channel = supabase.channel('realtime-investments')
             .on('postgres_changes', {
-                event: 'INSERT',
+                event: '*', // Listen to all changes
                 schema: 'public',
                 table: 'investments'
             }, (payload) => {
-                fetchApprovals(); // Refetch when a new investment is made
+                fetchApprovals(); // Refetch on any change
             })
             .subscribe();
 
@@ -62,23 +98,21 @@ export default function AdminApprovalsPage() {
 
     }, []);
 
-    const handleApproval = async (id: number, newStatus: 'approved' | 'rejected') => {
-        const { error } = await supabase
-            .from('investments')
-            .update({ status: newStatus })
-            .eq('id', id);
-
-        if (error) {
-            toast({ variant: 'destructive', title: 'Error updating status', description: error.message });
-        } else {
-            toast({ title: `Submission ${newStatus}` });
-            fetchApprovals(); // Refresh the list
-        }
+    const handleApproval = (approval: Approval, newStatus: 'approved' | 'rejected') => {
+        startTransition(async () => {
+            try {
+                await processApproval(approval.id, newStatus, approval.screenshot_url);
+                toast({ title: `Submission ${newStatus}` });
+                // The realtime subscription will automatically refresh the list
+            } catch (error: any) {
+                toast({ variant: 'destructive', title: 'Error updating status', description: error.message });
+            }
+        });
     };
 
     return (
         <>
-            <AdminDashboardHeader title="Investment Approvals" />
+            <AdminDashboardHeader title="Investment Approvals" onRefresh={fetchApprovals} />
             <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
                  <Card>
                     <CardHeader>
@@ -124,10 +158,10 @@ export default function AdminApprovalsPage() {
                                             </Dialog>
                                        </TableCell>
                                        <TableCell className="text-right space-x-2">
-                                           <Button variant="outline" size="icon" className="text-green-600 hover:bg-green-100 hover:text-green-700 border-green-200" onClick={() => handleApproval(approval.id, 'approved')}>
+                                           <Button variant="outline" size="icon" className="text-green-600 hover:bg-green-100 hover:text-green-700 border-green-200" onClick={() => handleApproval(approval, 'approved')} disabled={isPending}>
                                                <Check className="h-4 w-4" />
                                            </Button>
-                                            <Button variant="outline" size="icon" className="text-red-600 hover:bg-red-100 hover:text-red-700 border-red-200" onClick={() => handleApproval(approval.id, 'rejected')}>
+                                            <Button variant="outline" size="icon" className="text-red-600 hover:bg-red-100 hover:text-red-700 border-red-200" onClick={() => handleApproval(approval, 'rejected')} disabled={isPending}>
                                                <X className="h-4 w-4" />
                                            </Button>
                                        </TableCell>
@@ -135,12 +169,12 @@ export default function AdminApprovalsPage() {
                                ))}
                            </TableBody>
                        </Table>
-                       {(loading) && (
+                       {(loading || isPending) && (
                             <div className="text-center text-muted-foreground py-12">
-                                Loading approvals...
+                                {isPending ? 'Processing...' : 'Loading approvals...'}
                             </div>
                        )}
-                       {!loading && pendingApprovals.length === 0 && (
+                       {!loading && !isPending && pendingApprovals.length === 0 && (
                             <div className="text-center text-muted-foreground py-12">
                                 No pending approvals.
                             </div>

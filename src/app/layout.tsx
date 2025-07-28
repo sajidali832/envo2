@@ -1,10 +1,11 @@
+
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
-  title: 'Envo-Earn Simplified',
+  title: 'Envo Earn',
   description: 'A simplified investment platform.',
   manifest: '/manifest.json',
 };

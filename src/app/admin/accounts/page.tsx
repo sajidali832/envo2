@@ -1,3 +1,4 @@
+
 "use server";
 
 import { AdminDashboardHeader } from "@/components/admin/admin-dashboard-header";
@@ -5,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabaseAdmin } from "@/lib/supabaseClient";
 import { Badge } from "@/components/ui/badge";
+import { revalidatePath } from "next/cache";
 
 async function fetchUserAccounts() {
     if (!supabaseAdmin) {
@@ -32,9 +34,14 @@ async function fetchUserAccounts() {
 export default async function AdminAccountsPage() {
     const { accounts, error } = await fetchUserAccounts();
 
+    async function handleRefresh() {
+        'use server'
+        revalidatePath('/admin/accounts');
+    }
+
     return (
         <>
-            <AdminDashboardHeader title="Registered Accounts" />
+            <AdminDashboardHeader title="Registered Accounts" onRefresh={handleRefresh} />
             <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
                 <Card>
                     <CardHeader>

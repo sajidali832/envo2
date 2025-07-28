@@ -1,3 +1,4 @@
+
 "use client";
 
 import { AdminDashboardHeader } from "@/components/admin/admin-dashboard-header";
@@ -106,7 +107,7 @@ export default function AdminDashboardPage() {
 
     return (
         <>
-            <AdminDashboardHeader title="Admin Dashboard" />
+            <AdminDashboardHeader title="Admin Dashboard" onRefresh={fetchDashboardData} />
             <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
                  <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
                     <Card>

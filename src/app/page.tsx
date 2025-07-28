@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -12,14 +13,14 @@ export default function Home() {
       avatar: "https://placehold.co/40x40.png",
       aiHint: "pakistani man",
       title: "Software Engineer, Lahore",
-      quote: "Envo-Earn is so simple to use. I started with a small investment and have seen consistent returns. The referral bonus is a great incentive too!",
+      quote: "Envo Earn is so simple to use. I started with a small investment and have seen consistent returns. The referral bonus is a great incentive too!",
     },
     {
       name: "Fatima Ali",
       avatar: "https://placehold.co/40x40.png",
       aiHint: "woman portrait",
       title: "University Student, Karachi",
-      quote: "As a student, I don't have much to invest, but Envo-Earn made it possible to start growing my savings. The platform is very trustworthy and transparent.",
+      quote: "As a student, I don't have much to invest, but Envo Earn made it possible to start growing my savings. The platform is very trustworthy and transparent.",
     },
     {
       name: "Zainab Malik",
@@ -68,7 +69,7 @@ export default function Home() {
       avatar: "https://placehold.co/40x40.png",
       aiHint: "woman glasses",
       title: "Doctor, Quetta",
-      quote: "Envo-Earn is a breath of fresh air. It's simple, secure, and the returns have been exactly as promised. A trustworthy platform for sure.",
+      quote: "Envo Earn is a breath of fresh air. It's simple, secure, and the returns have been exactly as promised. A trustworthy platform for sure.",
     },
   ];
 
@@ -83,7 +84,7 @@ export default function Home() {
                 Invest with Confidence, Earn with Ease
               </h1>
               <p className="mt-4 text-muted-foreground md:text-xl">
-                Join Envo-Earn Simplified and watch your savings grow. A secure and straightforward way to build your financial future.
+                Join Envo Earn and watch your savings grow. A secure and straightforward way to build your financial future.
               </p>
               <div className="mt-6 flex justify-center gap-4">
                 <Button asChild size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90">
@@ -134,7 +135,7 @@ export default function Home() {
       </main>
       <footer className="bg-background border-t">
         <div className="container p-6 text-center text-muted-foreground">
-          <p>&copy; {new Date().getFullYear()} Envo-Earn Simplified. All Rights Reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Envo Earn. All Rights Reserved.</p>
         </div>
       </footer>
     </div>

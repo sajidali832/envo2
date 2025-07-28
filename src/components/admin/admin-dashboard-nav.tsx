@@ -1,15 +1,18 @@
+
 'use client';
 
 import Link from 'next/link';
 import { Users, ShieldCheck, Wallet, BarChart, LogOut, LucideIcon, KeyRound } from 'lucide-react';
 import { Button } from '../ui/button';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
 const LogoIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg width="28" height="28" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
-        <circle cx="20" cy="20" r="20" className="fill-primary" />
-        <path d="M15.424 26V14H26V16.6H19.584V19.14H24.84V21.74H19.584V26H15.424Z" className="fill-primary-foreground" />
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+        <circle cx="12" cy="12" r="10" className="fill-primary" />
+        <path d="M15.5 9.5L12 13L8.5 9.5" stroke="hsl(var(--primary-foreground))" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M12 13V16" stroke="hsl(var(--primary-foreground))" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M10 7H14" stroke="hsl(var(--primary-foreground))" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
 );
 
@@ -40,12 +43,23 @@ const NavLink = ({ href, icon: Icon, label }: { href: string; icon: LucideIcon; 
 };
 
 export function AdminDashboardNav() {
+    const router = useRouter();
+
+    const handleLogout = () => {
+        try {
+            localStorage.removeItem('admin_auth');
+            router.push('/admin');
+        } catch (error) {
+            console.error("Failed to logout", error);
+        }
+    }
+
     return (
         <div className="flex h-full flex-col">
             <div className="flex items-center border-b p-4">
                 <Link href="/admin/dashboard" className="flex items-center gap-2 font-semibold font-headline">
                     <LogoIcon />
-                    <span>Envo-Earn Admin</span>
+                    <span>Envo Earn Admin</span>
                 </Link>
             </div>
             <nav className="flex-1 space-y-2 p-4">
@@ -54,12 +68,10 @@ export function AdminDashboardNav() {
                 ))}
             </nav>
             <div className="mt-auto border-t p-4">
-                <Link href="/admin">
-                     <Button variant="ghost" className="w-full justify-start">
-                        <LogOut className="mr-2 h-4 w-4" />
-                        Logout
-                    </Button>
-                </Link>
+                <Button variant="ghost" className="w-full justify-start" onClick={handleLogout}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Logout
+                </Button>
             </div>
         </div>
     );

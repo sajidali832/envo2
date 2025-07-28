@@ -1,3 +1,4 @@
+
 "use client";
 
 import { AdminDashboardHeader } from "@/components/admin/admin-dashboard-header";
@@ -10,9 +11,28 @@ import { MoreHorizontal, Trash2, Edit } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { revalidatePath } from "next/cache";
+
+async function updateUserBalance(userId: string, newBalance: number) {
+    'use server'
+    const { supabaseAdmin } = await import('@/lib/supabaseClient');
+    if (!supabaseAdmin) {
+        throw new Error('Admin client not available');
+    }
+
+    const { error } = await supabaseAdmin
+        .from('profiles')
+        .update({ total_earnings: newBalance })
+        .eq('id', userId);
+    
+    if (error) {
+        throw new Error(error.message);
+    }
+}
+
 
 type User = {
     id: string;
@@ -32,6 +52,10 @@ export default function AdminUsersPage() {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [dataVersion, setDataVersion] = useState(0); // State to trigger re-fetch
     const { toast } = useToast();
+
+    const forceRefresh = () => {
+        setDataVersion(v => v + 1);
+    };
 
     const fetchUsers = useCallback(async () => {
         setLoading(true);
@@ -71,19 +95,15 @@ export default function AdminUsersPage() {
             return;
         }
 
-        const { error } = await supabase
-            .from('profiles')
-            .update({ total_earnings: numericBalance })
-            .eq('id', editingUser.id);
-        
-        setIsSaving(false);
-
-        if (error) {
-            toast({ variant: 'destructive', title: 'Error updating balance', description: error.message });
-        } else {
+        try {
+            await updateUserBalance(editingUser.id, numericBalance);
             toast({ title: 'Balance updated successfully' });
+            forceRefresh(); // Force a data refresh
             setIsDialogOpen(false); 
-            setDataVersion(v => v + 1); // Force a data refresh
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Error updating balance', description: error.message });
+        } finally {
+            setIsSaving(false);
         }
     };
     
@@ -93,15 +113,13 @@ export default function AdminUsersPage() {
     };
 
     const handleDeleteUser = async (userId: string) => {
-        // Note: RLS must allow 'delete' for authenticated users on 'profiles'
-        // or this must be moved to a server action with admin client.
         const { error } = await supabase.auth.admin.deleteUser(userId);
 
         if (error) {
              toast({ variant: 'destructive', title: 'Error deleting user', description: error.message });
         } else {
             toast({ title: 'User has been permanently deleted' });
-            setDataVersion(v => v + 1); // Force a data refresh
+            forceRefresh();
         }
     };
     
@@ -115,7 +133,7 @@ export default function AdminUsersPage() {
 
     return (
         <>
-            <AdminDashboardHeader title="User Management" />
+            <AdminDashboardHeader title="User Management" onRefresh={forceRefresh} />
             <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
@@ -237,4 +255,3 @@ export default function AdminUsersPage() {
         </>
     );
 }
-    
