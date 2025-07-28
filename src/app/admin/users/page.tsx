@@ -53,21 +53,7 @@ export default function AdminUsersPage() {
 
     useEffect(() => {
         fetchUsers();
-
-        const channel = supabase.channel('realtime-profiles-admin')
-            .on('postgres_changes', {
-                event: '*',
-                schema: 'public',
-                table: 'profiles'
-            }, (payload) => {
-                setDataVersion(v => v + 1); // Trigger re-fetch on any change
-            })
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [fetchUsers, dataVersion]); // Add dataVersion as a dependency
+    }, [fetchUsers, dataVersion]);
 
     const handleEditClick = (user: User) => {
         setEditingUser(user);
@@ -108,6 +94,8 @@ export default function AdminUsersPage() {
     };
 
     const handleDeleteUser = async (userId: string) => {
+        // Note: RLS must allow 'delete' for authenticated users on 'profiles'
+        // or this must be moved to a server action with admin client.
         const { error } = await supabase.auth.admin.deleteUser(userId);
 
         if (error) {
@@ -249,4 +237,5 @@ export default function AdminUsersPage() {
             </Dialog>
         </>
     );
-}
+
+    
