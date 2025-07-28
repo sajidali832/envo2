@@ -26,7 +26,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge";
-import { Wallet, Edit, CheckCircle, RefreshCw, AlertCircle } from "lucide-react";
+import { Wallet, Edit, CheckCircle, RefreshCw } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
@@ -48,12 +48,18 @@ type WithdrawalHistory = {
     amount: number;
 }
 
-type View = 'loading' | 'setup' | 'saved' | 'request';
+type Profile = {
+    id: string;
+    total_earnings: number;
+    // other profile fields
+}
+
+type View = 'loading' | 'setup' | 'saved';
 
 export default function WithdrawPage() {
     const { toast } = useToast();
     const [user, setUser] = useState<User | null>(null);
-    const [profile, setProfile] = useState<any>(null);
+    const [profile, setProfile] = useState<Profile | null>(null);
     const [savedAccount, setSavedAccount] = useState<SavedAccount | null>(null);
     const [withdrawalHistory, setWithdrawalHistory] = useState<WithdrawalHistory[]>([]);
     const [view, setView] = useState<View>('loading');
@@ -63,31 +69,31 @@ export default function WithdrawPage() {
     const [accountName, setAccountName] = useState('');
     const [accountNumber, setAccountNumber] = useState('');
     const [requestAmount, setRequestAmount] = useState<number | string>('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
     
-    const latestWithdrawal = withdrawalHistory?.[0];
+    const latestWithdrawal = withdrawalHistory[0];
+    const hasPendingWithdrawal = latestWithdrawal?.status === 'pending';
 
     async function fetchData() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
-            setView('setup'); // Or redirect to login
+            setView('setup');
             return;
         }
         setUser(user);
 
-        const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-        const { data: accountData, error: accountError } = await supabase.from('withdrawal_accounts').select('*').eq('user_id', user.id).maybeSingle();
-        const { data: historyData } = await supabase.from('withdrawals').select('*').eq('user_id', user.id).order('requested_at', { ascending: false });
-        
-        if (accountError) {
-             console.error("Error fetching account:", accountError);
-             // This can happen if the RLS policies are not set up correctly or if there's a network issue.
-             // We still want to let the user try to set up their account.
-             if (accountError.code !== 'PGRST116') { // Ignore "not found" errors which are expected
-                toast({ variant: 'destructive', title: 'Could not fetch withdrawal account', description: accountError.message });
-             }
-        }
+        // Fetch profile, account, and history in parallel
+        const [
+            { data: profileData },
+            { data: accountData },
+            { data: historyData }
+        ] = await Promise.all([
+            supabase.from('profiles').select('*').eq('id', user.id).single(),
+            supabase.from('withdrawal_accounts').select('*').eq('user_id', user.id).maybeSingle(),
+            supabase.from('withdrawals').select('*').eq('user_id', user.id).order('requested_at', { ascending: false })
+        ]);
 
-        setProfile(profileData);
+        setProfile(profileData as Profile);
         const currentAccount = accountData ?? null;
         setSavedAccount(currentAccount);
         setWithdrawalHistory(historyData as WithdrawalHistory[] ?? []);
@@ -101,11 +107,14 @@ export default function WithdrawPage() {
 
     useEffect(() => {
         fetchData();
-        const channel = supabase.channel('realtime-withdrawals')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'withdrawals' }, (payload) => {
+        const channel = supabase.channel('realtime-withdrawals-user')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'withdrawals', filter: `user_id=eq.${user?.id}` }, (payload) => {
                 fetchData();
             })
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'withdrawal_accounts' }, (payload) => {
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'withdrawal_accounts', filter: `user_id=eq.${user?.id}` }, (payload) => {
+                fetchData();
+            })
+             .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${user?.id}` }, (payload) => {
                 fetchData();
             })
             .subscribe();
@@ -113,7 +122,7 @@ export default function WithdrawPage() {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, []);
+    }, [user?.id]);
 
     const handleSaveAccount = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -121,22 +130,20 @@ export default function WithdrawPage() {
             toast({ variant: 'destructive', title: 'Please fill all fields.' });
             return;
         }
-
+        
         const { error } = await supabase.from('withdrawal_accounts').upsert({
             user_id: user.id,
             method,
             account_name: accountName,
             account_number: accountNumber,
-        }, {
-            onConflict: 'user_id'
-        });
+        }, { onConflict: 'user_id' }).select().single();
 
         if (error) {
             console.error("Save account error:", error);
             toast({ variant: 'destructive', title: 'Error saving account', description: error.message });
         } else {
             toast({ title: 'Account saved successfully!' });
-            await fetchData(); // This will refresh the state and change the view
+            await fetchData();
         }
     };
     
@@ -151,14 +158,28 @@ export default function WithdrawPage() {
 
     const handleWithdrawRequest = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!user || !requestAmount || !savedAccount) {
-             toast({ variant: 'destructive', title: 'Please enter an amount.' });
+        setIsSubmitting(true);
+
+        const amount = Number(requestAmount);
+        if (!user || !amount || !savedAccount || !profile) {
+             toast({ variant: 'destructive', title: 'Invalid request.' });
+             setIsSubmitting(false);
+            return;
+        }
+        if (amount < 600 || amount > 1600) {
+            toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Withdrawal must be between 600 and 1600 PKR.'});
+            setIsSubmitting(false);
+            return;
+        }
+         if (amount > profile.total_earnings) {
+            toast({ variant: 'destructive', title: 'Insufficient Balance', description: 'You do not have enough earnings to withdraw this amount.'});
+            setIsSubmitting(false);
             return;
         }
        
         const { error } = await supabase.from('withdrawals').insert({
             user_id: user.id,
-            amount: requestAmount,
+            amount: amount,
             method: savedAccount.method,
             account_info: { name: savedAccount.account_name, number: savedAccount.account_number },
             status: 'pending'
@@ -171,56 +192,36 @@ export default function WithdrawPage() {
             setRequestAmount('');
             fetchData();
         }
+        setIsSubmitting(false);
     };
     
     const renderWithdrawalStatus = () => {
-        if (!latestWithdrawal || latestWithdrawal.status === 'approved' || latestWithdrawal.status === 'rejected') {
+        if (hasPendingWithdrawal) {
             return (
-                 <form onSubmit={handleWithdrawRequest} className="space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="amount">Amount (PKR)</Label>
-                        <Input id="amount" type="number" placeholder="600" value={requestAmount} onChange={e => setRequestAmount(e.target.value)} required/>
-                    </div>
-                    <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">Request Withdrawal</Button>
-                </form>
-            );
+                 <div className="text-center py-4">
+                    <RefreshCw className="mx-auto h-10 w-10 mb-2 text-primary animate-spin" />
+                    <p className="font-semibold text-lg">Processing...</p>
+                    <p className="text-muted-foreground text-sm">Your request of {latestWithdrawal.amount} PKR is pending.</p>
+                </div>
+            )
         }
-        
-        let statusText, Icon, colorClass;
-        
-        switch(latestWithdrawal.status) {
-            case 'pending':
-                statusText = 'Processing...';
-                Icon = RefreshCw;
-                colorClass = 'text-primary animate-spin';
-                break;
-            default:
-                // This case handles approved/rejected for the latest request, showing the form again.
-                // It should already be handled by the condition above, but as a fallback:
-                 return (
-                     <form onSubmit={handleWithdrawRequest} className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="amount">Amount (PKR)</Label>
-                            <Input id="amount" type="number" placeholder="600" value={requestAmount} onChange={e => setRequestAmount(e.target.value)} required/>
-                        </div>
-                        <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">Request Withdrawal</Button>
-                    </form>
-                );
-        }
-
         return (
-            <div className="text-center py-4">
-                <Icon className={`mx-auto h-10 w-10 mb-2 ${colorClass}`} />
-                <p className="font-semibold text-lg">{statusText}</p>
-                <p className="text-muted-foreground text-sm">Your request of {latestWithdrawal.amount} PKR is {latestWithdrawal.status}.</p>
-            </div>
-        )
+            <form onSubmit={handleWithdrawRequest} className="space-y-4">
+                <div className="space-y-2">
+                    <Label htmlFor="amount">Amount (PKR)</Label>
+                    <Input id="amount" type="number" placeholder="Enter amount between 600-1600" value={requestAmount} onChange={e => setRequestAmount(e.target.value)} required disabled={isSubmitting}/>
+                </div>
+                <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" disabled={isSubmitting}>
+                    {isSubmitting ? 'Submitting...' : 'Request Withdrawal'}
+                </Button>
+            </form>
+        );
     }
 
   return (
-      <div className="flex-1 overflow-y-auto">
-          <div className="flex flex-col gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
-            <div className="grid md:grid-cols-3 gap-8 mt-4 md:mt-0">
+    <div className="flex-1 overflow-y-auto">
+        <div className="flex flex-col gap-4 p-4 sm:px-6 md:gap-8">
+            <div className="grid md:grid-cols-3 gap-8">
                 <div className="md:col-span-1 space-y-8">
                     <Card>
                         <CardHeader>
@@ -251,7 +252,7 @@ export default function WithdrawPage() {
                     </Card>
                 </div>
                 <div className="md:col-span-2">
-                     {view === 'loading' && (
+                    {view === 'loading' && (
                         <Card>
                             <CardContent className="flex items-center justify-center h-48">
                                 <p className="text-muted-foreground">Loading your account...</p>
@@ -265,7 +266,7 @@ export default function WithdrawPage() {
                                 <CardDescription>Add your Easypaisa or JazzCash account details.</CardDescription>
                             </CardHeader>
                             <CardContent>
-                              <form onSubmit={handleSaveAccount} className="space-y-4">
+                                <form onSubmit={handleSaveAccount} className="space-y-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="platform">Platform</Label>
                                     <Select value={method} onValueChange={(value) => setMethod(value as any)} required>
@@ -282,7 +283,7 @@ export default function WithdrawPage() {
                                     <Label htmlFor="account-name">Account Holder Name</Label>
                                     <Input id="account-name" placeholder="e.g. Zulekhan Bibi" value={accountName} onChange={e => setAccountName(e.target.value)} required/>
                                 </div>
-                                 <div className="space-y-2">
+                                    <div className="space-y-2">
                                     <Label htmlFor="account-number">Account Number</Label>
                                     <Input id="account-number" placeholder="e.g. 03130306344" value={accountNumber} onChange={e => setAccountNumber(e.target.value)} required/>
                                 </div>
@@ -290,17 +291,17 @@ export default function WithdrawPage() {
                                     <Button type="submit" className="w-full">Save Account</Button>
                                     {savedAccount && <Button variant="outline" className="w-full" onClick={() => setView('saved')}>Cancel</Button>}
                                 </div>
-                              </form>
+                                </form>
                             </CardContent>
                         </Card>
                     )}
                     {view === 'saved' && savedAccount && (
-                         <Card>
+                        <Card>
                             <CardHeader>
                                 <CardTitle>Request a Withdrawal</CardTitle>
                                 <div className="flex items-center justify-between">
                                     <CardDescription>Your payment method is saved.</CardDescription>
-                                     <Button variant="outline" size="sm" onClick={handleEdit}><Edit className="h-3 w-3 mr-2"/>Edit</Button>
+                                    <Button variant="outline" size="sm" onClick={handleEdit}><Edit className="h-3 w-3 mr-2"/>Edit</Button>
                                 </div>
                             </CardHeader>
                             <CardContent className="space-y-4">
@@ -326,30 +327,30 @@ export default function WithdrawPage() {
                     <CardDescription>A record of your past withdrawal requests.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Date</TableHead>
-                                <TableHead>Method</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead className="text-right">Amount</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                             {view === 'loading' ? (
-                                 <TableRow><TableCell colSpan={4} className="text-center py-12">Loading history...</TableCell></TableRow>
-                             ) : withdrawalHistory.length === 0 ? (
+                    <div className="w-full overflow-x-auto">
+                        <Table>
+                            <TableHeader>
                                 <TableRow>
-                                    <TableCell colSpan={4} className="text-center text-muted-foreground py-12">
+                                    <TableHead>Amount</TableHead>
+                                    <TableHead>Method</TableHead>
+                                    <TableHead className="text-right">Status</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {view === 'loading' ? (
+                                    <TableRow><TableCell colSpan={3} className="text-center py-12">Loading history...</TableCell></TableRow>
+                                ) : withdrawalHistory.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={3} className="text-center text-muted-foreground py-12">
                                         You have no withdrawal history.
                                     </TableCell>
                                 </TableRow>
                             ) : (
                                 withdrawalHistory.map((item) => (
                                     <TableRow key={item.id}>
-                                        <TableCell className="font-medium">{new Date(item.requested_at).toLocaleDateString()}</TableCell>
+                                        <TableCell className="font-mono font-medium">{item.amount.toFixed(2)} PKR</TableCell>
                                         <TableCell>{item.method}</TableCell>
-                                        <TableCell>
+                                        <TableCell className="text-right">
                                             <Badge variant={
                                                 item.status === 'approved' ? 'default' :
                                                 item.status === 'pending' ? 'secondary' : 'destructive'
@@ -359,15 +360,15 @@ export default function WithdrawPage() {
                                                 {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell className="text-right font-mono">{item.amount.toFixed(2)} PKR</TableCell>
                                     </TableRow>
                                 ))
                             )}
-                        </TableBody>
-                    </Table>
+                            </TableBody>
+                        </Table>
+                    </div>
                 </CardContent>
             </Card>
-          </div>
-      </div>
+        </div>
+    </div>
   );
 }

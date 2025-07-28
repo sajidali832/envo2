@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 
 type Withdrawal = {
     id: number;
+    user_id: string;
     requested_at: string;
     amount: number;
     method: string;
@@ -32,6 +33,7 @@ export default function AdminWithdrawalsPage() {
             .from('withdrawals')
             .select(`
                 id,
+                user_id,
                 requested_at,
                 amount,
                 method,
@@ -52,19 +54,54 @@ export default function AdminWithdrawalsPage() {
 
     useEffect(() => {
         fetchWithdrawals();
+
+        const channel = supabase.channel('admin-withdrawals')
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'withdrawals'
+            }, (payload) => {
+                fetchWithdrawals(); 
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, []);
 
-    const handleUpdate = async (id: number, newStatus: 'approved' | 'rejected') => {
-        const { error } = await supabase
-            .from('withdrawals')
-            .update({ status: newStatus })
-            .eq('id', id);
+    const handleUpdate = async (withdrawal: Withdrawal, newStatus: 'approved' | 'rejected') => {
+        // If rejecting, we just update the status.
+        if (newStatus === 'rejected') {
+            const { error } = await supabase
+                .from('withdrawals')
+                .update({ status: newStatus })
+                .eq('id', withdrawal.id);
+            
+            if (error) {
+                toast({ variant: 'destructive', title: 'Error updating status', description: error.message });
+            } else {
+                toast({ title: `Withdrawal ${newStatus}` });
+                fetchWithdrawals(); // Refresh list
+            }
+            return;
+        }
 
-        if (error) {
-            toast({ variant: 'destructive', title: 'Error updating status', description: error.message });
-        } else {
-            toast({ title: `Withdrawal ${newStatus}` });
-            fetchWithdrawals(); // Refresh list
+        // If approving, it's a transaction: update withdrawal and user's balance.
+        try {
+            const { error } = await supabase.rpc('approve_withdrawal', {
+                withdrawal_id: withdrawal.id,
+                user_id_to_update: withdrawal.user_id,
+                withdrawal_amount: withdrawal.amount
+            });
+
+            if (error) throw error;
+            
+            toast({ title: `Withdrawal approved!` });
+            fetchWithdrawals();
+
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Error approving withdrawal', description: error.message });
         }
     };
 
@@ -105,10 +142,10 @@ export default function AdminWithdrawalsPage() {
                                             {req.account_info.name} ({req.account_info.number})
                                         </TableCell>
                                         <TableCell className="text-right space-x-2">
-                                            <Button variant="outline" size="icon" className="text-green-600 hover:bg-green-100 hover:text-green-700 border-green-200" onClick={() => handleUpdate(req.id, 'approved')}>
+                                            <Button variant="outline" size="icon" className="text-green-600 hover:bg-green-100 hover:text-green-700 border-green-200" onClick={() => handleUpdate(req, 'approved')}>
                                                 <Check className="h-4 w-4" />
                                             </Button>
-                                             <Button variant="outline" size="icon" className="text-red-600 hover:bg-red-100 hover:text-red-700 border-red-200" onClick={() => handleUpdate(req.id, 'rejected')}>
+                                             <Button variant="outline" size="icon" className="text-red-600 hover:bg-red-100 hover:text-red-700 border-red-200" onClick={() => handleUpdate(req, 'rejected')}>
                                                 <X className="h-4 w-4" />
                                             </Button>
                                         </TableCell>
