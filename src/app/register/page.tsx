@@ -12,12 +12,13 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Landmark, AlertCircle } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, Suspense } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import Image from "next/image";
 
 function RegisterForm() {
   const router = useRouter();
@@ -161,7 +162,7 @@ function RegisterForm() {
       <Card className="w-full max-w-md mx-4">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
-                <Landmark className="h-8 w-8 text-primary" />
+                <Image src="/logo.png" alt="Envo-Earn Logo" width={40} height={40} />
           </div>
           <CardTitle className="text-2xl font-headline">Create an Account</CardTitle>
           <CardDescription>

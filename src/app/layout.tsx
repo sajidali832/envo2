@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 export const metadata: Metadata = {
   title: 'Envo-Earn Simplified',
   description: 'A simplified investment platform.',
+  manifest: '/manifest.json',
 };
 
 export default function RootLayout({

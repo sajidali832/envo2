@@ -1,10 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { Landmark, Users, ShieldCheck, Wallet, BarChart, LogOut, LucideIcon, KeyRound } from 'lucide-react';
+import { Users, ShieldCheck, Wallet, BarChart, LogOut, LucideIcon, KeyRound } from 'lucide-react';
 import { Button } from '../ui/button';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import Image from 'next/image';
 
 const navItems = [
     { href: '/admin/dashboard', icon: BarChart, label: 'Dashboard' },
@@ -36,7 +37,7 @@ export function AdminDashboardNav() {
         <div className="flex h-full flex-col">
             <div className="flex items-center border-b p-4">
                 <Link href="/admin/dashboard" className="flex items-center gap-2 font-semibold font-headline">
-                    <Landmark className="h-6 w-6 text-primary" />
+                    <Image src="/logo.png" alt="Envo-Earn Logo" width={28} height={28} />
                     <span>Envo-Earn Admin</span>
                 </Link>
             </div>

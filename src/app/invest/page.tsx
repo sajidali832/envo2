@@ -12,13 +12,14 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Landmark, ArrowLeft, Info, UserPlus, Gift } from "lucide-react";
+import { ArrowLeft, Info, UserPlus } from "lucide-react";
 import { CopyButton } from "@/components/copy-button";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import React, { useState, useEffect, Suspense } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
+import Image from "next/image";
 
 function InvestContent() {
   const router = useRouter();
@@ -113,7 +114,7 @@ function InvestContent() {
                 </Link>
             </Button>
             <Link href="/" className="flex items-center gap-2">
-                <Landmark className="h-6 w-6 text-primary" />
+                <Image src="/logo.png" alt="Envo-Earn Logo" width={28} height={28} />
                 <span className="font-bold font-headline">Envo-Earn</span>
             </Link>
             <div className="w-10"></div>
@@ -124,10 +125,19 @@ function InvestContent() {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          {ref && (
+          {ref && referrerName && (
             <Alert variant="default" className="bg-green-500/10 border-green-500/20 text-green-700">
               <UserPlus className="h-4 w-4 text-green-600" />
-              <AlertTitle className="text-green-800">You were invited by your friend!</AlertTitle>
+              <AlertTitle className="text-green-800">You were invited by {referrerName}!</AlertTitle>
+              <AlertDescription className="text-green-700">
+                Register after your investment is approved to receive a <strong>200 PKR bonus</strong>.
+              </AlertDescription>
+            </Alert>
+          )}
+           {ref && !referrerName && (
+            <Alert variant="default" className="bg-green-500/10 border-green-500/20 text-green-700">
+              <UserPlus className="h-4 w-4 text-green-600" />
+              <AlertTitle className="text-green-800">You were invited by a friend!</AlertTitle>
               <AlertDescription className="text-green-700">
                 Register after your investment is approved to receive a <strong>200 PKR bonus</strong>.
               </AlertDescription>

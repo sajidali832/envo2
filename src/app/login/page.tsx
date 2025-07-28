@@ -11,11 +11,11 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Landmark } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
+import Image from "next/image";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -49,7 +49,7 @@ export default function LoginPage() {
        <Card className="w-full max-w-md mx-4">
         <CardHeader className="space-y-1 text-center">
             <div className="flex justify-center mb-4">
-                <Landmark className="h-8 w-8 text-primary" />
+                <Image src="/logo.png" alt="Envo-Earn Logo" width={40} height={40} />
             </div>
             <CardTitle className="text-2xl font-headline">Welcome Back</CardTitle>
             <CardDescription>
