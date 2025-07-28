@@ -12,8 +12,15 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
+
+const LogoIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+        <circle cx="20" cy="20" r="20" className="fill-primary" />
+        <path d="M15.424 26V14H26V16.6H19.584V19.14H24.84V21.74H19.584V26H15.424Z" className="fill-primary-foreground" />
+    </svg>
+);
+
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -50,7 +57,7 @@ export default function AdminLoginPage() {
       <Card className="w-full max-w-md mx-4">
         <CardHeader className="space-y-1 text-center">
            <div className="flex justify-center mb-4">
-                <Image src="/logo.png" alt="Envo-Earn Logo" width={40} height={40} />
+                <LogoIcon />
             </div>
           <CardTitle className="text-2xl font-headline">Admin Panel Access</CardTitle>
           <CardDescription>
