@@ -113,7 +113,7 @@ function PaymentStatusContent() {
                         <svg className="w-full h-full" viewBox="0 0 100 100">
                             {/* Background circle */}
                             <circle
-                                className="text-gray-200 stroke-current"
+                                className="text-muted stroke-current"
                                 strokeWidth="5"
                                 cx="50"
                                 cy="50"
@@ -122,7 +122,7 @@ function PaymentStatusContent() {
                             ></circle>
                             {/* Progress circle */}
                             <circle
-                                className="text-primary-500 progress-ring__circle stroke-current"
+                                className="text-primary stroke-current -rotate-90 origin-center"
                                 strokeWidth="5"
                                 strokeLinecap="round"
                                 cx="50"
