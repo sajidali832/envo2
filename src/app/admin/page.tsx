@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Image from "next/image";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AdminLoginPage() {
   const router = useRouter();
