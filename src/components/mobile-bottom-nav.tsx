@@ -1,14 +1,16 @@
+
 "use client";
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Wallet, Users, LucideIcon } from 'lucide-react';
+import { LayoutDashboard, Wallet, Users, Settings, LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
     { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { href: '/dashboard/withdraw', icon: Wallet, label: 'Withdraw' },
     { href: '/dashboard/referrals', icon: Users, label: 'Referrals' },
+    { href: '/dashboard/settings', icon: Settings, label: 'Settings' },
 ];
 
 const NavLink = ({ href, icon: Icon, label }: { href: string; icon: LucideIcon; label: string }) => {
