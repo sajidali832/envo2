@@ -1,3 +1,4 @@
+
 "use client";
 
 import { AdminDashboardHeader } from "@/components/admin/admin-dashboard-header";
@@ -78,10 +79,9 @@ export default function AdminWithdrawalsPage() {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [toast]);
+    }, []);
 
     const handleUpdate = async (withdrawal: Withdrawal, newStatus: 'approved' | 'rejected') => {
-        // If rejecting, we just update the status.
         if (newStatus === 'rejected') {
             const { error } = await supabase
                 .from('withdrawals')
@@ -92,26 +92,55 @@ export default function AdminWithdrawalsPage() {
                 toast({ variant: 'destructive', title: 'Error updating status', description: error.message });
             } else {
                 toast({ title: `Withdrawal ${newStatus}` });
-                fetchWithdrawals(); // Refresh list
+                // Realtime subscription will handle refresh
             }
             return;
         }
 
-        // If approving, it's a transaction: update withdrawal and user's balance.
-        try {
-            const { error } = await supabase.rpc('approve_withdrawal', {
-                withdrawal_id: withdrawal.id,
-                user_id_to_update: withdrawal.user_id,
-                withdrawal_amount: withdrawal.amount
-            });
+        // --- Approval Logic ---
+        // 1. Get current user earnings
+        const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('total_earnings')
+            .eq('id', withdrawal.user_id)
+            .single();
 
-            if (error) throw error;
-            
+        if (profileError || !profileData) {
+            toast({ variant: 'destructive', title: 'Error fetching user profile', description: profileError?.message ?? 'User profile not found.' });
+            return;
+        }
+
+        // 2. Calculate new balance
+        const newBalance = profileData.total_earnings - withdrawal.amount;
+        if (newBalance < 0) {
+             toast({ variant: 'destructive', title: 'Insufficient user balance', description: 'Approving this withdrawal would result in a negative balance.' });
+             return;
+        }
+
+        // 3. Update user's balance
+        const { error: updateProfileError } = await supabase
+            .from('profiles')
+            .update({ total_earnings: newBalance })
+            .eq('id', withdrawal.user_id);
+
+        if (updateProfileError) {
+            toast({ variant: 'destructive', title: 'Error updating user balance', description: updateProfileError.message });
+            return;
+        }
+        
+        // 4. Update withdrawal status
+        const { error: updateWithdrawalError } = await supabase
+            .from('withdrawals')
+            .update({ status: 'approved' })
+            .eq('id', withdrawal.id);
+
+        if (updateWithdrawalError) {
+            // Attempt to revert balance change if this fails
+            await supabase.from('profiles').update({ total_earnings: profileData.total_earnings }).eq('id', withdrawal.user_id);
+            toast({ variant: 'destructive', title: 'Error approving withdrawal', description: updateWithdrawalError.message + '. User balance change was reverted.' });
+        } else {
             toast({ title: `Withdrawal approved!` });
-            fetchWithdrawals();
-
-        } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Error approving withdrawal', description: error.message });
+            // Realtime will handle refresh
         }
     };
 
