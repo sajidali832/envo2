@@ -1,4 +1,3 @@
-
 "use client";
 
 import { AdminDashboardHeader } from "@/components/admin/admin-dashboard-header";
@@ -237,5 +236,5 @@ export default function AdminUsersPage() {
             </Dialog>
         </>
     );
-
+}
     
