@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, Trash2, Edit } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
@@ -33,7 +33,7 @@ export default function AdminUsersPage() {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const { toast } = useToast();
 
-    async function fetchUsers() {
+    const fetchUsers = useCallback(async () => {
         setLoading(true);
         const { data, error } = await supabase
             .from('profiles')
@@ -42,11 +42,13 @@ export default function AdminUsersPage() {
         
         if (error) {
             toast({ variant: 'destructive', title: 'Error fetching users', description: error.message });
+            setUsers([]);
         } else {
             setUsers(data as User[]);
         }
         setLoading(false);
-    }
+    }, [toast]);
+
 
     useEffect(() => {
         fetchUsers();
@@ -64,7 +66,7 @@ export default function AdminUsersPage() {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, []);
+    }, [fetchUsers]);
 
     const handleEditClick = (user: User) => {
         setEditingUser(user);
@@ -77,8 +79,8 @@ export default function AdminUsersPage() {
 
         setIsSaving(true);
         const numericBalance = Number(newBalance);
-        if (isNaN(numericBalance)) {
-            toast({ variant: 'destructive', title: 'Invalid balance value' });
+        if (isNaN(numericBalance) || numericBalance < 0) {
+            toast({ variant: 'destructive', title: 'Invalid balance value', description: 'Balance must be a non-negative number.' });
             setIsSaving(false);
             return;
         }
@@ -96,22 +98,27 @@ export default function AdminUsersPage() {
             toast({ title: 'Balance updated successfully' });
             setIsDialogOpen(false); 
             // The real-time subscription will handle the UI update by calling fetchUsers()
+            // but we can also trigger it manually for instant feedback
+            await fetchUsers();
         }
     };
     
     const handleBalanceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
-        setNewBalance(value === '' ? '' : value);
+        setNewBalance(value === '' ? '' : Number(value));
     };
 
     const handleDeleteUser = async (userId: string) => {
+        // This requires admin privileges and should ideally be a secure server-side operation.
+        // The current implementation uses the Supabase admin client, which should be handled carefully.
         const { error } = await supabase.auth.admin.deleteUser(userId);
 
         if (error) {
              toast({ variant: 'destructive', title: 'Error deleting user', description: error.message });
         } else {
             toast({ title: 'User has been permanently deleted' });
-            fetchUsers();
+            // The subscription should handle the refresh, but we'll call it to be sure
+            await fetchUsers();
         }
     };
 
@@ -174,7 +181,7 @@ export default function AdminUsersPage() {
                                                             Edit User
                                                         </DropdownMenuItem>
                                                         <AlertDialogTrigger asChild>
-                                                            <DropdownMenuItem className="text-red-600">
+                                                            <DropdownMenuItem className="text-red-600 focus:text-red-600 focus:bg-red-100">
                                                                 <Trash2 className="mr-2 h-4 w-4" />
                                                                 Delete User
                                                             </DropdownMenuItem>
@@ -190,7 +197,7 @@ export default function AdminUsersPage() {
                                                     </AlertDialogHeader>
                                                     <AlertDialogFooter>
                                                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                        <AlertDialogAction onClick={() => handleDeleteUser(user.id)}>Continue</AlertDialogAction>
+                                                        <AlertDialogAction onClick={() => handleDeleteUser(user.id)} className="bg-destructive hover:bg-destructive/90">Continue</AlertDialogAction>
                                                     </AlertDialogFooter>
                                                 </AlertDialogContent>
                                             </AlertDialog>
@@ -223,7 +230,7 @@ export default function AdminUsersPage() {
                                 <p className="text-sm">{new Date(editingUser.created_at).toLocaleString()}</p>
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4 pt-4">
-                                <Label htmlFor="balance" className="text-right">Balance (PKR)</Label>
+                                <Label htmlFor="balance" className="text-right col-span-1">Balance (PKR)</Label>
                                 <Input id="balance" type="number" value={newBalance} onChange={handleBalanceChange} className="col-span-3" />
                             </div>
                         </div>

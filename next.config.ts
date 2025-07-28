@@ -21,7 +21,7 @@ const nextConfig: NextConfig = {
         hostname: 'erfxugkthvipzzwguxzd.supabase.co',
         port: '',
         pathname: '/**',
-      }
+      },
     ],
   },
 };
