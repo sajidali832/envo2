@@ -11,7 +11,7 @@ import { MoreHorizontal, Trash2, Edit } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
@@ -31,6 +31,7 @@ export default function AdminUsersPage() {
     const [newBalance, setNewBalance] = useState<number | string>("");
     const [isSaving, setIsSaving] = useState(false);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [dataVersion, setDataVersion] = useState(0); // State to trigger re-fetch
     const { toast } = useToast();
 
     const fetchUsers = useCallback(async () => {
@@ -59,14 +60,14 @@ export default function AdminUsersPage() {
                 schema: 'public',
                 table: 'profiles'
             }, (payload) => {
-                fetchUsers();
+                setDataVersion(v => v + 1); // Trigger re-fetch on any change
             })
             .subscribe();
 
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [fetchUsers]);
+    }, [fetchUsers, dataVersion]); // Add dataVersion as a dependency
 
     const handleEditClick = (user: User) => {
         setEditingUser(user);
@@ -97,9 +98,7 @@ export default function AdminUsersPage() {
         } else {
             toast({ title: 'Balance updated successfully' });
             setIsDialogOpen(false); 
-            // We must manually trigger a re-fetch to guarantee the UI updates.
-            // The real-time subscription is good but can have delays.
-            await fetchUsers();
+            setDataVersion(v => v + 1); // Force a data refresh
         }
     };
     
@@ -109,24 +108,22 @@ export default function AdminUsersPage() {
     };
 
     const handleDeleteUser = async (userId: string) => {
-        // This requires admin privileges and should ideally be a secure server-side operation.
-        // The current implementation uses the Supabase admin client, which should be handled carefully.
         const { error } = await supabase.auth.admin.deleteUser(userId);
 
         if (error) {
              toast({ variant: 'destructive', title: 'Error deleting user', description: error.message });
         } else {
             toast({ title: 'User has been permanently deleted' });
-            // The subscription should handle the refresh, but we'll call it to be sure
-            await fetchUsers();
+            setDataVersion(v => v + 1); // Force a data refresh
         }
     };
     
-    // Close dialog and reset state
-    const closeDialog = () => {
-        setIsDialogOpen(false);
-        setEditingUser(null);
-        setNewBalance("");
+    const onDialogClose = (open: boolean) => {
+        if (!open) {
+            setIsDialogOpen(false);
+            setEditingUser(null);
+            setNewBalance("");
+        }
     }
 
     return (
@@ -217,7 +214,7 @@ export default function AdminUsersPage() {
                 </Card>
             </main>
 
-            <Dialog open={isDialogOpen} onOpenChange={closeDialog}>
+            <Dialog open={isDialogOpen} onOpenChange={onDialogClose}>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Edit User: {editingUser?.full_name}</DialogTitle>
@@ -243,7 +240,7 @@ export default function AdminUsersPage() {
                         </div>
                     )}
                     <DialogFooter>
-                        <Button variant="outline" onClick={closeDialog}>Cancel</Button>
+                        <Button variant="outline" onClick={() => onDialogClose(false)}>Cancel</Button>
                         <Button onClick={handleSaveBalance} disabled={isSaving}>
                             {isSaving ? 'Saving...' : 'Save changes'}
                         </Button>
