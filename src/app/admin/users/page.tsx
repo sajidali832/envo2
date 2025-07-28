@@ -1,3 +1,4 @@
+
 "use client";
 
 import { AdminDashboardHeader } from "@/components/admin/admin-dashboard-header";
@@ -28,13 +29,16 @@ export default function AdminUsersPage() {
     const [loading, setLoading] = useState(true);
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [newBalance, setNewBalance] = useState<number | string>(0);
+    const [isSaving, setIsSaving] = useState(false);
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
     const { toast } = useToast();
 
     async function fetchUsers() {
         setLoading(true);
         const { data, error } = await supabase
             .from('profiles')
-            .select('*');
+            .select('*')
+            .order('created_at', { ascending: false });
         
         if (error) {
             toast({ variant: 'destructive', title: 'Error fetching users', description: error.message });
@@ -62,18 +66,20 @@ export default function AdminUsersPage() {
         };
     }, []);
 
-
-    const handleEditUser = (user: User) => {
+    const handleEditClick = (user: User) => {
         setEditingUser(user);
         setNewBalance(user.total_earnings);
+        setIsDialogOpen(true);
     };
 
     const handleSaveBalance = async () => {
-        if (!editingUser) return;
+        if (!editingUser || isSaving) return;
 
+        setIsSaving(true);
         const numericBalance = Number(newBalance);
         if (isNaN(numericBalance)) {
             toast({ variant: 'destructive', title: 'Invalid balance value' });
+            setIsSaving(false);
             return;
         }
 
@@ -82,15 +88,14 @@ export default function AdminUsersPage() {
             .update({ total_earnings: numericBalance })
             .eq('id', editingUser.id);
         
+        setIsSaving(false);
+
         if (error) {
             toast({ variant: 'destructive', title: 'Error updating balance', description: error.message });
         } else {
             toast({ title: 'Balance updated successfully' });
-            // The realtime subscription will handle the UI update
-            const dialogCloseButton = document.getElementById('edit-dialog-close');
-            if (dialogCloseButton) {
-                dialogCloseButton.click();
-            }
+            setIsDialogOpen(false); 
+            // The real-time subscription will handle the UI update by calling fetchUsers()
         }
     };
     
@@ -99,18 +104,14 @@ export default function AdminUsersPage() {
         setNewBalance(value === '' ? '' : value);
     };
 
-
     const handleDeleteUser = async (userId: string) => {
-        // This is a "soft delete" by disabling the user's account
-        const { error } = await supabase.auth.admin.updateUserById(userId, {
-            ban_duration: 'none' // 'none' is a Supabase term for indefinite ban
-        });
+        const { error } = await supabase.auth.admin.deleteUser(userId);
 
         if (error) {
              toast({ variant: 'destructive', title: 'Error deleting user', description: error.message });
         } else {
-            toast({ title: 'User has been blocked' });
-            // The realtime subscription will handle the UI update
+            toast({ title: 'User has been permanently deleted' });
+            fetchUsers();
         }
     };
 
@@ -123,9 +124,6 @@ export default function AdminUsersPage() {
                         <div>
                             <CardTitle>All Users</CardTitle>
                             <CardDescription>View, edit, or delete user information.</CardDescription>
-                        </div>
-                        <div className="w-full max-w-sm">
-                            <Input placeholder="Search users by name, email, or ID..." />
                         </div>
                     </CardHeader>
                     <CardContent>
@@ -156,14 +154,13 @@ export default function AdminUsersPage() {
                                     </TableRow>
                                 ) : users.map((user) => (
                                    <TableRow key={user.id}>
-                                       <TableCell className="font-medium truncate max-w-xs">{user.id}</TableCell>
+                                       <TableCell className="font-medium truncate max-w-[150px]">{user.id}</TableCell>
                                        <TableCell>{user.full_name}</TableCell>
                                        <TableCell>{user.email}</TableCell>
                                        <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
                                        <TableCell>{user.total_earnings} PKR</TableCell>
                                        <TableCell className="text-center">{user.total_referrals}</TableCell>
                                        <TableCell className="text-right">
-                                           <Dialog onOpenChange={(open) => !open && setEditingUser(null)}>
                                             <AlertDialog>
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
@@ -172,12 +169,10 @@ export default function AdminUsersPage() {
                                                         </Button>
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end">
-                                                        <DialogTrigger asChild>
-                                                            <DropdownMenuItem onSelect={() => handleEditUser(user)}>
-                                                                <Edit className="mr-2 h-4 w-4" />
-                                                                Edit User
-                                                            </DropdownMenuItem>
-                                                        </DialogTrigger>
+                                                        <DropdownMenuItem onSelect={() => handleEditClick(user)}>
+                                                            <Edit className="mr-2 h-4 w-4" />
+                                                            Edit User
+                                                        </DropdownMenuItem>
                                                         <AlertDialogTrigger asChild>
                                                             <DropdownMenuItem className="text-red-600">
                                                                 <Trash2 className="mr-2 h-4 w-4" />
@@ -186,12 +181,11 @@ export default function AdminUsersPage() {
                                                         </AlertDialogTrigger>
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
-
                                                 <AlertDialogContent>
                                                     <AlertDialogHeader>
-                                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                                                         <AlertDialogDescription>
-                                                            This action will permanently block the user from accessing their account. They will not be able to log in again.
+                                                            This action cannot be undone. This will permanently delete the user's account and remove their data from our servers.
                                                         </AlertDialogDescription>
                                                     </AlertDialogHeader>
                                                     <AlertDialogFooter>
@@ -200,24 +194,6 @@ export default function AdminUsersPage() {
                                                     </AlertDialogFooter>
                                                 </AlertDialogContent>
                                             </AlertDialog>
-                                            <DialogContent>
-                                                <DialogHeader>
-                                                    <DialogTitle>Edit User: {editingUser?.full_name}</DialogTitle>
-                                                </DialogHeader>
-                                                <div className="grid gap-4 py-4">
-                                                    <div className="grid grid-cols-4 items-center gap-4">
-                                                        <Label htmlFor="balance" className="text-right">Balance (PKR)</Label>
-                                                        <Input id="balance" type="number" value={newBalance} onChange={handleBalanceChange} className="col-span-3" />
-                                                    </div>
-                                                </div>
-                                                <DialogFooter>
-                                                    <DialogClose asChild>
-                                                         <Button id="edit-dialog-close" variant="outline">Cancel</Button>
-                                                    </DialogClose>
-                                                    <Button onClick={handleSaveBalance}>Save changes</Button>
-                                                </DialogFooter>
-                                            </DialogContent>
-                                           </Dialog>
                                        </TableCell>
                                    </TableRow>
                                ))}
@@ -226,6 +202,42 @@ export default function AdminUsersPage() {
                     </CardContent>
                 </Card>
             </main>
+
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Edit User: {editingUser?.full_name}</DialogTitle>
+                    </DialogHeader>
+                    {editingUser && (
+                        <div className="grid gap-4 py-4">
+                            <div className="space-y-1">
+                                <Label className="text-muted-foreground">User ID</Label>
+                                <p className="text-sm font-mono">{editingUser.id}</p>
+                            </div>
+                             <div className="space-y-1">
+                                <Label className="text-muted-foreground">Email</Label>
+                                <p className="text-sm">{editingUser.email}</p>
+                            </div>
+                             <div className="space-y-1">
+                                <Label className="text-muted-foreground">Join Date</Label>
+                                <p className="text-sm">{new Date(editingUser.created_at).toLocaleString()}</p>
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4 pt-4">
+                                <Label htmlFor="balance" className="text-right">Balance (PKR)</Label>
+                                <Input id="balance" type="number" value={newBalance} onChange={handleBalanceChange} className="col-span-3" />
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <DialogClose asChild>
+                             <Button variant="outline">Cancel</Button>
+                        </DialogClose>
+                        <Button onClick={handleSaveBalance} disabled={isSaving}>
+                            {isSaving ? 'Saving...' : 'Save changes'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </>
     );
 }
