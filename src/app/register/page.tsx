@@ -37,6 +37,12 @@ function RegisterForm() {
     const emailFromQuery = searchParams.get('email');
     const refFromQuery = searchParams.get('ref');
 
+    // If user lands on /register with a ref code, redirect to /invest
+    if (refFromQuery && !emailFromQuery) {
+        router.replace(`/invest?ref=${refFromQuery}`);
+        return;
+    }
+
     if (refFromQuery) {
         setRefCode(refFromQuery);
     }
@@ -65,7 +71,7 @@ function RegisterForm() {
         }
     };
     verifyInvestment();
-  }, [searchParams]);
+  }, [searchParams, router]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -21,6 +21,7 @@ type Profile = {
     referral_code: string;
     total_referrals: number;
     total_earnings: number;
+    referral_bonus_total: number;
 };
 
 type ReferredUser = {
@@ -92,7 +93,7 @@ export default function ReferralsPage() {
                     <DollarSign className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                    <div className="text-2xl font-bold">{(profile?.total_referrals ?? 0) * 200} PKR</div>
+                    <div className="text-2xl font-bold">{profile?.referral_bonus_total ?? 0} PKR</div>
                     <p className="text-xs text-muted-foreground">Total earnings from referrals</p>
                     </CardContent>
                 </Card>

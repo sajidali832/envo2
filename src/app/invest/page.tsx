@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -11,7 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Landmark, ArrowLeft, Info, UserPlus } from "lucide-react";
+import { Landmark, ArrowLeft, Info, UserPlus, Gift } from "lucide-react";
 import { CopyButton } from "@/components/copy-button";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -123,12 +124,12 @@ function InvestContent() {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          {referrerName && (
-            <Alert variant="default" className="bg-primary/10 border-primary/20">
-              <UserPlus className="h-4 w-4 text-primary" />
-              <AlertTitle className="text-primary">You were referred!</AlertTitle>
-              <AlertDescription>
-                You were invited by <strong>{referrerName}</strong>. Complete your investment to sign up.
+          {ref && (
+            <Alert variant="default" className="bg-green-500/10 border-green-500/20 text-green-700">
+              <UserPlus className="h-4 w-4 text-green-600" />
+              <AlertTitle className="text-green-800">You were invited by your friend!</AlertTitle>
+              <AlertDescription className="text-green-700">
+                Register after your investment is approved to receive a <strong>200 PKR bonus</strong>.
               </AlertDescription>
             </Alert>
           )}
