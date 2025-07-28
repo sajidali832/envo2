@@ -29,8 +29,8 @@ export default function InvestPage() {
   const [screenshot, setScreenshot] = useState<File | null>(null);
 
   const easypaisaDetails = {
-    accountName: "Envo-Earn Finance",
-    phoneNumber: "0312-3456789",
+    accountName: "Zulekhan",
+    phoneNumber: "03130306344",
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
