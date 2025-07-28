@@ -19,8 +19,6 @@ import { useState, useEffect, Suspense } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-export const dynamic = 'force-dynamic';
-
 function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -32,6 +30,7 @@ function RegisterForm() {
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [isValid, setIsValid] = useState<boolean | null>(null);
+  const [investmentId, setInvestmentId] = useState<number | null>(null);
 
   useEffect(() => {
     const emailFromQuery = searchParams.get('email');
@@ -43,9 +42,10 @@ function RegisterForm() {
     const verifyInvestment = async () => {
         const { data, error } = await supabase
             .from('investments')
-            .select('status')
+            .select('id, status')
             .eq('email', emailFromQuery)
             .eq('status', 'approved')
+            .is('user_id', null) // Check if account is not already created
             .limit(1)
             .single();
 
@@ -54,6 +54,7 @@ function RegisterForm() {
         } else {
             setIsValid(true);
             setEmail(emailFromQuery);
+            setInvestmentId(data.id);
         }
     };
     verifyInvestment();
@@ -62,11 +63,11 @@ function RegisterForm() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password !== confirmPassword) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Passwords do not match.",
-      });
+      toast({ variant: "destructive", title: "Error", description: "Passwords do not match." });
+      return;
+    }
+    if (!investmentId) {
+      toast({ variant: "destructive", title: "Error", description: "Could not find a valid investment to link." });
       return;
     }
     setLoading(true);
@@ -83,30 +84,27 @@ function RegisterForm() {
 
     if (error) {
         setLoading(false);
-        toast({
-            variant: "destructive",
-            title: "Registration Failed",
-            description: error.message,
-        });
+        toast({ variant: "destructive", title: "Registration Failed", description: error.message });
         return;
     }
     
-    // Update the user_id in the investments table
     if (user) {
-        await supabase
-            .from('investments')
-            .update({ user_id: user.id })
-            .eq('email', email);
+        // Call the RPC function to finalize registration
+        const { error: rpcError } = await supabase.rpc('finalize_registration', {
+            investment_id: investmentId,
+            new_user_id: user.id
+        });
+
+        if (rpcError) {
+             setLoading(false);
+             toast({ variant: "destructive", title: "Bonus Error", description: `Account created, but failed to apply referral bonus: ${rpcError.message}` });
+             return;
+        }
     }
     
     setLoading(false);
-
-    toast({
-        title: "Registration Successful!",
-        description: "Please check your email to verify your account.",
-    });
+    toast({ title: "Registration Successful!", description: "Please check your email to verify your account." });
     router.push("/login");
-
   };
 
   if (isValid === null) {
@@ -131,7 +129,7 @@ function RegisterForm() {
                       <AlertCircle className="h-4 w-4" />
                       <AlertTitle>Error</AlertTitle>
                       <AlertDescription>
-                        You must have an approved investment to create an account. Please start by making an investment.
+                        You must have a recent, approved investment to create an account, or an account may already exist for this investment. Please start by making a new investment.
                       </AlertDescription>
                     </Alert>
                     <Button asChild className="w-full mt-4 bg-accent text-accent-foreground hover:bg-accent/90">

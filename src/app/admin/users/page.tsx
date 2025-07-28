@@ -46,7 +46,22 @@ export default function AdminUsersPage() {
 
     useEffect(() => {
         fetchUsers();
+
+        const channel = supabase.channel('realtime-profiles-admin')
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'profiles'
+            }, (payload) => {
+                fetchUsers();
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, []);
+
 
     const handleEditUser = (user: User) => {
         setEditingUser(user);
@@ -55,25 +70,33 @@ export default function AdminUsersPage() {
 
     const handleSaveBalance = async () => {
         if (!editingUser) return;
+
+        const numericBalance = Number(newBalance);
+        if (isNaN(numericBalance)) {
+            toast({ variant: 'destructive', title: 'Invalid balance value' });
+            return;
+        }
+
         const { error } = await supabase
             .from('profiles')
-            .update({ total_earnings: newBalance })
+            .update({ total_earnings: numericBalance })
             .eq('id', editingUser.id);
         
         if (error) {
             toast({ variant: 'destructive', title: 'Error updating balance', description: error.message });
         } else {
             toast({ title: 'Balance updated successfully' });
-            fetchUsers();
-            setEditingUser(null);
+            // The realtime subscription will handle the UI update
+            const dialogCloseButton = document.getElementById('edit-dialog-close');
+            if (dialogCloseButton) {
+                dialogCloseButton.click();
+            }
         }
     };
     
     const handleBalanceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
-        // If the value is an empty string, set it directly. Otherwise, parse it as a float.
-        // This prevents the "NaN" error when the field is cleared.
-        setNewBalance(value === '' ? '' : parseFloat(value) || 0);
+        setNewBalance(value === '' ? '' : value);
     };
 
 
@@ -87,7 +110,7 @@ export default function AdminUsersPage() {
              toast({ variant: 'destructive', title: 'Error deleting user', description: error.message });
         } else {
             toast({ title: 'User has been blocked' });
-            fetchUsers();
+            // The realtime subscription will handle the UI update
         }
     };
 
@@ -189,7 +212,7 @@ export default function AdminUsersPage() {
                                                 </div>
                                                 <DialogFooter>
                                                     <DialogClose asChild>
-                                                         <Button variant="outline">Cancel</Button>
+                                                         <Button id="edit-dialog-close" variant="outline">Cancel</Button>
                                                     </DialogClose>
                                                     <Button onClick={handleSaveBalance}>Save changes</Button>
                                                 </DialogFooter>
