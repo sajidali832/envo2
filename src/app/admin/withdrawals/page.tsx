@@ -18,7 +18,7 @@ type Withdrawal = {
     method: string;
     account_info: { name: string; number: string };
     status: string;
-    profiles: { full_name: string } | null;
+    user_name: string; // Added to store the fetched user name
 };
 
 
@@ -31,24 +31,34 @@ export default function AdminWithdrawalsPage() {
         setLoading(true);
         const { data, error } = await supabase
             .from('withdrawals')
-            .select(`
-                id,
-                user_id,
-                requested_at,
-                amount,
-                method,
-                account_info,
-                status,
-                profiles ( full_name )
-            `)
+            .select('*')
             .eq('status', 'pending')
             .order('requested_at', { ascending: true });
 
         if (error) {
             toast({ variant: 'destructive', title: 'Error fetching withdrawals', description: error.message });
-        } else {
-            setPendingWithdrawals(data as any);
+            setPendingWithdrawals([]);
+            setLoading(false);
+            return;
         }
+
+        // Fetch user names for each withdrawal
+        const withdrawalsWithUserNames = await Promise.all(
+            data.map(async (withdrawal) => {
+                const { data: profileData, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('full_name')
+                    .eq('id', withdrawal.user_id)
+                    .single();
+                
+                return {
+                    ...withdrawal,
+                    user_name: profileError ? 'Unknown' : profileData.full_name,
+                };
+            })
+        );
+        
+        setPendingWithdrawals(withdrawalsWithUserNames as any);
         setLoading(false);
     }
 
@@ -57,7 +67,7 @@ export default function AdminWithdrawalsPage() {
 
         const channel = supabase.channel('admin-withdrawals')
             .on('postgres_changes', {
-                event: 'INSERT',
+                event: '*',
                 schema: 'public',
                 table: 'withdrawals'
             }, (payload) => {
@@ -68,7 +78,7 @@ export default function AdminWithdrawalsPage() {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, []);
+    }, [toast]);
 
     const handleUpdate = async (withdrawal: Withdrawal, newStatus: 'approved' | 'rejected') => {
         // If rejecting, we just update the status.
@@ -132,7 +142,7 @@ export default function AdminWithdrawalsPage() {
                                 {pendingWithdrawals.map((req) => (
                                     <TableRow key={req.id}>
                                         <TableCell className="font-medium">{req.id}</TableCell>
-                                        <TableCell>{req.profiles?.full_name ?? 'N/A'}</TableCell>
+                                        <TableCell>{req.user_name ?? 'N/A'}</TableCell>
                                         <TableCell>{new Date(req.requested_at).toLocaleString()}</TableCell>
                                         <TableCell className="font-semibold">{req.amount} PKR</TableCell>
                                         <TableCell>
