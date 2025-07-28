@@ -17,6 +17,7 @@ import { supabase } from "@/lib/supabaseClient";
 function PaymentStatusContent() {
   const searchParams = useSearchParams();
   const email = searchParams.get("email");
+  const ref = searchParams.get("ref");
   const router = useRouter();
 
   const [status, setStatus] = useState<string | null>(null); // 'pending', 'approved', 'rejected', or null
@@ -146,9 +147,10 @@ function PaymentStatusContent() {
 
   const renderAction = () => {
      if (status === 'approved') {
+         const registerUrl = ref ? `/register?email=${encodeURIComponent(email!)}&ref=${ref}` : `/register?email=${encodeURIComponent(email!)}`;
          return (
             <Button asChild size="lg" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
-              <Link href={`/register?email=${encodeURIComponent(email!)}`}>Create Your Account</Link>
+              <Link href={registerUrl}>Create Your Account</Link>
             </Button>
          )
      }

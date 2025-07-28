@@ -86,13 +86,13 @@ function InvestContent() {
                 screenshot_url: publicUrl,
                 status: 'pending',
                 email: email,
-                referred_by_code: ref,
             });
 
         if (insertError) throw insertError;
 
         toast({ title: "Submission successful!", description: "Your investment is under review."});
-        router.push(`/payment-status?email=${encodeURIComponent(email)}`);
+        const redirectUrl = ref ? `/payment-status?email=${encodeURIComponent(email)}&ref=${ref}` : `/payment-status?email=${encodeURIComponent(email)}`;
+        router.push(redirectUrl);
 
     } catch (error: any) {
         toast({ variant: "destructive", title: "Submission failed", description: error.message });
@@ -128,7 +128,7 @@ function InvestContent() {
               <UserPlus className="h-4 w-4 text-primary" />
               <AlertTitle className="text-primary">You were referred!</AlertTitle>
               <AlertDescription>
-                You were invited by <strong>{referrerName}</strong>.
+                You were invited by <strong>{referrerName}</strong>. Complete your investment to sign up.
               </AlertDescription>
             </Alert>
           )}

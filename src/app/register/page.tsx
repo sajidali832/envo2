@@ -31,9 +31,16 @@ function RegisterForm() {
   const [loading, setLoading] = useState(false);
   const [isValid, setIsValid] = useState<boolean | null>(null);
   const [investmentId, setInvestmentId] = useState<number | null>(null);
+  const [refCode, setRefCode] = useState<string | null>(null);
 
   useEffect(() => {
     const emailFromQuery = searchParams.get('email');
+    const refFromQuery = searchParams.get('ref');
+
+    if (refFromQuery) {
+        setRefCode(refFromQuery);
+    }
+
     if (!emailFromQuery) {
       setIsValid(false);
       return;
@@ -78,6 +85,7 @@ function RegisterForm() {
       options: {
         data: {
           full_name: fullName,
+          referral_code: `${fullName.split(' ')[0].toLowerCase()}${Math.random().toString(36).substring(2, 6)}`
         }
       }
     });
@@ -90,15 +98,16 @@ function RegisterForm() {
     
     if (user) {
         // Call the RPC function to finalize registration
-        const { error: rpcError } = await supabase.rpc('finalize_registration', {
-            investment_id: investmentId,
-            new_user_id: user.id
+        const { error: rpcError } = await supabase.rpc('finalize_registration_with_bonus', {
+            p_investment_id: investmentId,
+            p_new_user_id: user.id,
+            p_referral_code: refCode
         });
 
         if (rpcError) {
              setLoading(false);
              toast({ variant: "destructive", title: "Bonus Error", description: `Account created, but failed to apply referral bonus: ${rpcError.message}` });
-             return;
+             // Even if bonus fails, we proceed
         }
     }
     
