@@ -28,7 +28,7 @@ export default function AdminUsersPage() {
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [editingUser, setEditingUser] = useState<User | null>(null);
-    const [newBalance, setNewBalance] = useState<number | string>(0);
+    const [newBalance, setNewBalance] = useState<number | string>("");
     const [isSaving, setIsSaving] = useState(false);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const { toast } = useToast();
@@ -97,8 +97,8 @@ export default function AdminUsersPage() {
         } else {
             toast({ title: 'Balance updated successfully' });
             setIsDialogOpen(false); 
-            // The real-time subscription will handle the UI update by calling fetchUsers()
-            // but we can also trigger it manually for instant feedback
+            // We must manually trigger a re-fetch to guarantee the UI updates.
+            // The real-time subscription is good but can have delays.
             await fetchUsers();
         }
     };
@@ -121,6 +121,13 @@ export default function AdminUsersPage() {
             await fetchUsers();
         }
     };
+    
+    // Close dialog and reset state
+    const closeDialog = () => {
+        setIsDialogOpen(false);
+        setEditingUser(null);
+        setNewBalance("");
+    }
 
     return (
         <>
@@ -176,7 +183,7 @@ export default function AdminUsersPage() {
                                                         </Button>
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end">
-                                                        <DropdownMenuItem onSelect={() => handleEditClick(user)}>
+                                                        <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleEditClick(user);}}>
                                                             <Edit className="mr-2 h-4 w-4" />
                                                             Edit User
                                                         </DropdownMenuItem>
@@ -210,7 +217,7 @@ export default function AdminUsersPage() {
                 </Card>
             </main>
 
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <Dialog open={isDialogOpen} onOpenChange={closeDialog}>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Edit User: {editingUser?.full_name}</DialogTitle>
@@ -236,9 +243,7 @@ export default function AdminUsersPage() {
                         </div>
                     )}
                     <DialogFooter>
-                        <DialogClose asChild>
-                             <Button variant="outline">Cancel</Button>
-                        </DialogClose>
+                        <Button variant="outline" onClick={closeDialog}>Cancel</Button>
                         <Button onClick={handleSaveBalance} disabled={isSaving}>
                             {isSaving ? 'Saving...' : 'Save changes'}
                         </Button>
