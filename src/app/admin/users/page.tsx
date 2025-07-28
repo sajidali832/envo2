@@ -1,4 +1,3 @@
-
 "use client";
 
 import { AdminDashboardHeader } from "@/components/admin/admin-dashboard-header";
@@ -14,25 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { revalidatePath } from "next/cache";
-
-async function updateUserBalance(userId: string, newBalance: number) {
-    'use server'
-    const { supabaseAdmin } = await import('@/lib/supabaseClient');
-    if (!supabaseAdmin) {
-        throw new Error('Admin client not available');
-    }
-
-    const { error } = await supabaseAdmin
-        .from('profiles')
-        .update({ total_earnings: newBalance })
-        .eq('id', userId);
-    
-    if (error) {
-        throw new Error(error.message);
-    }
-}
-
+import { updateUserBalance } from "./actions";
 
 type User = {
     id: string;
