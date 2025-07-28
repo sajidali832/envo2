@@ -19,6 +19,7 @@ import { useState, useEffect, Suspense } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
+export const dynamic = 'force-dynamic';
 
 function RegisterForm() {
   const router = useRouter();
