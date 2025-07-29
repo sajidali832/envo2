@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Eye, Check, X } from "lucide-react";
 import Image from "next/image";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -29,7 +29,7 @@ export default function AdminApprovalsPage() {
     const [isPending, startTransition] = useTransition();
     const { toast } = useToast();
 
-    const fetchApprovals = async () => {
+    const fetchApprovals = useCallback(async () => {
         setLoading(true);
         const { data, error } = await supabase
             .from('investments')
@@ -43,7 +43,7 @@ export default function AdminApprovalsPage() {
             setPendingApprovals(data as Approval[]);
         }
         setLoading(false);
-    };
+    }, [toast]);
 
     useEffect(() => {
         fetchApprovals();
@@ -62,7 +62,7 @@ export default function AdminApprovalsPage() {
             supabase.removeChannel(channel);
         };
 
-    }, []);
+    }, [fetchApprovals]);
 
     const handleApproval = (approval: Approval, newStatus: 'approved' | 'rejected') => {
         startTransition(async () => {
