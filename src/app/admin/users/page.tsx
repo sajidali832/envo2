@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, Trash2, Edit } from "lucide-react";
 import { useEffect, useState, useCallback, useTransition } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase, supabaseAdmin } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -43,14 +43,18 @@ export default function AdminUsersPage() {
         setLoading(true);
         const { data, error } = await supabase
             .from('profiles')
-            .select('*')
+            .select('*, user_email:users(email)') // Fetch email from auth.users table
             .order('created_at', { ascending: false });
         
         if (error) {
             toast({ variant: 'destructive', title: 'Error fetching users', description: error.message });
             setUsers([]);
         } else {
-            setUsers(data as User[]);
+             const formattedUsers = data.map((u: any) => ({
+                ...u,
+                email: u.user_email?.email ?? 'N/A' 
+            }));
+            setUsers(formattedUsers as User[]);
         }
         setLoading(false);
     }, [toast]);
@@ -58,6 +62,16 @@ export default function AdminUsersPage() {
 
     useEffect(() => {
         fetchUsers();
+         const channel = supabase
+            .channel('realtime-profiles-admin')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload) => {
+                forceRefresh();
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, [fetchUsers, dataVersion]);
 
     const handleEditClick = (user: User) => {
@@ -93,7 +107,12 @@ export default function AdminUsersPage() {
     };
 
     const handleDeleteUser = async (userId: string) => {
-        const { error } = await supabase.auth.admin.deleteUser(userId);
+        if (!supabaseAdmin) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Admin client not available. Check server configuration.' });
+            return;
+        }
+        
+        const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
 
         if (error) {
              toast({ variant: 'destructive', title: 'Error deleting user', description: error.message });
