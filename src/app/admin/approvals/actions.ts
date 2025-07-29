@@ -2,6 +2,7 @@
 'use server'
 
 import { supabaseAdmin } from "@/lib/supabaseClient";
+import { revalidatePath } from "next/cache";
 
 export async function processApproval(investmentId: number, newStatus: 'approved' | 'rejected', screenshotUrl: string) {
     if (!supabaseAdmin) {
@@ -23,7 +24,7 @@ export async function processApproval(investmentId: number, newStatus: 'approved
         try {
             // Extract the file path from the full URL
             const url = new URL(screenshotUrl);
-            const filePath = url.pathname.split('/object/public/investments/')[1];
+            const filePath = decodeURIComponent(url.pathname.split('/object/public/investments/')[1]);
             
             if (filePath) {
                 const { error: storageError } = await supabaseAdmin.storage
@@ -39,4 +40,7 @@ export async function processApproval(investmentId: number, newStatus: 'approved
             console.warn(`Error parsing screenshot URL for deletion: ${e.message}`);
         }
     }
+    
+    // 3. Revalidate the path to trigger a UI refresh
+    revalidatePath('/admin/approvals');
 }

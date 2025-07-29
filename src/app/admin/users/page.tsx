@@ -1,3 +1,4 @@
+
 "use client";
 
 import { AdminDashboardHeader } from "@/components/admin/admin-dashboard-header";
@@ -7,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, Trash2, Edit } from "lucide-react";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useTransition } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -29,9 +30,9 @@ export default function AdminUsersPage() {
     const [loading, setLoading] = useState(true);
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [newBalance, setNewBalance] = useState<number | string>("");
-    const [isSaving, setIsSaving] = useState(false);
+    const [isSaving, startTransition] = useTransition();
     const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const [dataVersion, setDataVersion] = useState(0); // State to trigger re-fetch
+    const [dataVersion, setDataVersion] = useState(0); 
     const { toast } = useToast();
 
     const forceRefresh = () => {
@@ -66,26 +67,24 @@ export default function AdminUsersPage() {
     };
 
     const handleSaveBalance = async () => {
-        if (!editingUser || isSaving) return;
+        if (!editingUser) return;
 
-        setIsSaving(true);
         const numericBalance = Number(newBalance);
         if (isNaN(numericBalance) || numericBalance < 0) {
             toast({ variant: 'destructive', title: 'Invalid balance value', description: 'Balance must be a non-negative number.' });
-            setIsSaving(false);
             return;
         }
 
-        try {
-            await updateUserBalance(editingUser.id, numericBalance);
-            toast({ title: 'Balance updated successfully' });
-            forceRefresh(); // Force a data refresh
-            setIsDialogOpen(false); 
-        } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Error updating balance', description: error.message });
-        } finally {
-            setIsSaving(false);
-        }
+        startTransition(async () => {
+            try {
+                await updateUserBalance(editingUser.id, numericBalance);
+                toast({ title: 'Balance updated successfully' });
+                forceRefresh(); 
+                setIsDialogOpen(false); 
+            } catch (error: any) {
+                toast({ variant: 'destructive', title: 'Error updating balance', description: error.message });
+            }
+        });
     };
     
     const handleBalanceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
