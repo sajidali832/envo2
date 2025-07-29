@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, UserPlus } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, Suspense } from "react";
@@ -47,7 +47,6 @@ function RegisterForm() {
     const emailFromQuery = searchParams.get('email');
     const refFromQuery = searchParams.get('ref');
 
-    // If user lands on /register with a ref code, redirect to /invest
     if (refFromQuery && !emailFromQuery) {
         router.replace(`/invest?ref=${refFromQuery}`);
         return;
@@ -68,7 +67,7 @@ function RegisterForm() {
             .select('id, status')
             .eq('email', emailFromQuery)
             .eq('status', 'approved')
-            .is('user_id', null) // Check if account is not already created
+            .is('user_id', null) 
             .limit(1)
             .single();
 
@@ -76,7 +75,6 @@ function RegisterForm() {
             setIsValid(false);
         } else {
             setIsValid(true);
-            setEmail(emailFromQuery);
             setInvestmentId(data.id);
         }
     };
@@ -113,7 +111,6 @@ function RegisterForm() {
     }
     
     if (user) {
-        // Call the RPC function to finalize registration
         const { error: rpcError } = await supabase.rpc('finalize_registration_with_bonus', {
             p_investment_id: investmentId,
             p_new_user_id: user.id,
@@ -123,7 +120,6 @@ function RegisterForm() {
         if (rpcError) {
              setLoading(false);
              toast({ variant: "destructive", title: "Bonus Error", description: `Account created, but failed to apply referral bonus: ${rpcError.message}` });
-             // Even if bonus fails, we proceed
         }
     }
     
@@ -192,8 +188,7 @@ function RegisterForm() {
                 placeholder="m@example.com"
                 required
                 value={email}
-                readOnly
-                className="bg-muted"
+                onChange={(e) => setEmail(e.target.value)}
               />
             </div>
             <div className="space-y-2">
