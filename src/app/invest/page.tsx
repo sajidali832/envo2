@@ -19,6 +19,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import React, { useState, useEffect, Suspense } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
+import { processInvestment } from "./actions";
 
 const LogoIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
@@ -35,10 +36,6 @@ function InvestContent() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
-  const [accountNumber, setAccountNumber] = useState('');
-  const [screenshot, setScreenshot] = useState<File | null>(null);
   const [ref, setRef] = useState<string | null>(null);
   const [referrerName, setReferrerName] = useState<string | null>(null);
 
@@ -65,51 +62,23 @@ function InvestContent() {
     phoneNumber: "03130306344",
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!screenshot || !email) {
-        toast({ variant: "destructive", title: "Please fill all fields and upload a screenshot."});
-        return;
-    }
-
     setLoading(true);
 
-    try {
-        const fileExt = screenshot.name.split('.').pop();
-        const fileName = `${email}-${Date.now()}.${fileExt}`;
-        const filePath = `screenshots/${fileName}`;
+    const formData = new FormData(e.currentTarget);
+    const result = await processInvestment(formData);
 
-        let { error: uploadError } = await supabase.storage
-            .from('investments')
-            .upload(filePath, screenshot);
-
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-            .from('investments')
-            .getPublicUrl(filePath);
-
-        const { error: insertError } = await supabase
-            .from('investments')
-            .insert({
-                user_name: fullName,
-                user_account_number: accountNumber,
-                screenshot_url: publicUrl,
-                status: 'pending',
-                email: email,
-            });
-
-        if (insertError) throw insertError;
-
+    if (result.error) {
+        toast({ variant: "destructive", title: "Submission failed", description: result.error });
+    } else {
         toast({ title: "Submission successful!", description: "Your investment is under review."});
+        const email = formData.get('email') as string;
         const redirectUrl = ref ? `/payment-status?email=${encodeURIComponent(email)}&ref=${ref}` : `/payment-status?email=${encodeURIComponent(email)}`;
         router.push(redirectUrl);
-
-    } catch (error: any) {
-        toast({ variant: "destructive", title: "Submission failed", description: error.message });
-    } finally {
-        setLoading(false);
     }
+    
+    setLoading(false);
   };
 
   return (
@@ -184,20 +153,20 @@ function InvestContent() {
              <h3 className="font-semibold mb-2">Step 2: Submit your details</h3>
              <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                    <Label htmlFor="account-name">Your Full Name</Label>
-                    <Input id="account-name" placeholder="e.g., John Doe" required value={fullName} onChange={e => setFullName(e.target.value)} />
+                    <Label htmlFor="fullName">Your Full Name</Label>
+                    <Input id="fullName" name="fullName" placeholder="e.g., John Doe" required />
                 </div>
                  <div className="space-y-2">
                     <Label htmlFor="email">Your Email Address</Label>
-                    <Input id="email" type="email" placeholder="you@example.com" required value={email} onChange={e => setEmail(e.target.value)} />
+                    <Input id="email" name="email" type="email" placeholder="you@example.com" required />
                 </div>
                  <div className="space-y-2">
-                    <Label htmlFor="account-number">Your Easypaisa Account Number</Label>
-                    <Input id="account-number" placeholder="e.g., 03001234567" required value={accountNumber} onChange={e => setAccountNumber(e.target.value)} />
+                    <Label htmlFor="accountNumber">Your Easypaisa Account Number</Label>
+                    <Input id="accountNumber" name="accountNumber" placeholder="e.g., 03001234567" required />
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="screenshot">Payment Screenshot</Label>
-                    <Input id="screenshot" type="file" required className="pt-2" onChange={e => setScreenshot(e.target.files ? e.target.files[0] : null)} />
+                    <Input id="screenshot" name="screenshot" type="file" required className="pt-2" />
                     <p className="text-xs text-muted-foreground">Upload the screenshot of your payment confirmation.</p>
                 </div>
                 <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" disabled={loading}>
