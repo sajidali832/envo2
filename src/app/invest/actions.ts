@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/lib/supabaseClient";
 
 export async function processInvestment(formData: FormData) {
     if (!supabaseAdmin) {
-        return { error: 'Admin client not available. Deployment may be missing environment variables.' };
+        return { error: 'Admin client not available. Deployment may be missing SUPABASE_SERVICE_KEY environment variable.' };
     }
 
     const fullName = formData.get('fullName') as string;
@@ -60,6 +60,9 @@ export async function processInvestment(formData: FormData) {
         return { success: true, error: null };
 
     } catch (error: any) {
+        // In case of failure, attempt to delete the uploaded screenshot if it exists
+        const filePath = `screenshots/${email}-${Date.now()}`; // Reconstruct a plausible filename to delete
+        await supabaseAdmin.storage.from('investments').remove([filePath]);
         return { error: error.message };
     }
 }

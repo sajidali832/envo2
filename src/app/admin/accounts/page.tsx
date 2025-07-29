@@ -7,11 +7,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { supabaseAdmin } from "@/lib/supabaseClient";
 import { Badge } from "@/components/ui/badge";
 import { revalidatePath } from "next/cache";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 async function fetchUserAccounts() {
     if (!supabaseAdmin) {
-        console.error("Admin client not available");
-        return { accounts: [], error: 'Admin client not available' };
+        return { accounts: [], error: 'Admin client not available. Ensure SUPABASE_SERVICE_KEY is set in your environment variables.' };
     }
 
     const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers();
@@ -52,7 +53,15 @@ export default async function AdminAccountsPage() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                       {error && <p className="text-destructive">Error: {error}</p>}
+                       {error && (
+                            <Alert variant="destructive">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertTitle>Error Fetching Data</AlertTitle>
+                                <AlertDescription>
+                                    {error}
+                                </AlertDescription>
+                            </Alert>
+                       )}
                        {!error && (
                            <Table>
                                <TableHeader>

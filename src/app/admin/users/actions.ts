@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 
 export async function updateUserBalance(userId: string, newBalance: number) {
     if (!supabaseAdmin) {
-        throw new Error('Admin client not available');
+        throw new Error('Admin client not available. Ensure SUPABASE_SERVICE_KEY is set in your environment variables.');
     }
     
     // Ensure userId is provided and is a valid UUID format if needed
@@ -20,6 +20,7 @@ export async function updateUserBalance(userId: string, newBalance: number) {
         .eq('id', userId); // Strictly match on the unique user ID
     
     if (error) {
+        console.error('Error updating balance in action:', error);
         throw new Error(`Failed to update balance: ${error.message}`);
     }
 

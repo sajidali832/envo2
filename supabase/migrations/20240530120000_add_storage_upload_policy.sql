@@ -1,2 +1,0 @@
--- This migration is obsolete and has been replaced.
--- Content is removed to prevent conflicts.
