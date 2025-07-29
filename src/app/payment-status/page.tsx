@@ -76,6 +76,7 @@ function PaymentStatusContent() {
 
   const minutes = Math.floor(countdown / 60);
   const seconds = countdown % 60;
+  const progress = (countdown / 600) * 100;
 
   const renderContent = () => {
     if (error) {
@@ -109,12 +110,26 @@ function PaymentStatusContent() {
         default:
             return (
                 <>
-                    <div className="relative w-32 h-32 mx-auto">
+                    <div className="relative w-40 h-40 mx-auto">
                         <svg className="w-full h-full" viewBox="0 0 100 100">
+                           {/* Define gradient */}
+                            <defs>
+                                <linearGradient id="timerGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" style={{stopColor: 'hsl(var(--primary))', stopOpacity: 1}} />
+                                <stop offset="100%" style={{stopColor: 'hsl(var(--accent))', stopOpacity: 1}} />
+                                </linearGradient>
+                                <filter id="glow">
+                                    <feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
+                                    <feMerge>
+                                        <feMergeNode in="coloredBlur" />
+                                        <feMergeNode in="SourceGraphic" />
+                                    </feMerge>
+                                </filter>
+                            </defs>
                             {/* Background circle */}
                             <circle
-                                className="text-muted stroke-current"
-                                strokeWidth="5"
+                                className="text-muted/50 stroke-current"
+                                strokeWidth="7"
                                 cx="50"
                                 cy="50"
                                 r="45"
@@ -122,19 +137,20 @@ function PaymentStatusContent() {
                             ></circle>
                             {/* Progress circle */}
                             <circle
-                                className="text-primary stroke-current -rotate-90 origin-center"
-                                strokeWidth="5"
+                                className="stroke-[url(#timerGradient)] -rotate-90 origin-center"
+                                strokeWidth="7"
                                 strokeLinecap="round"
                                 cx="50"
                                 cy="50"
                                 r="45"
                                 fill="transparent"
-                                strokeDasharray="282.6"
-                                strokeDashoffset={`calc(282.6 - (282.6 * ${countdown}) / 600)`}
+                                strokeDasharray="282.74"
+                                strokeDashoffset={282.74 - (282.74 * progress) / 100}
                                 style={{ transition: 'stroke-dashoffset 1s linear' }}
+                                filter="url(#glow)"
                             ></circle>
                         </svg>
-                         <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center text-2xl font-mono font-bold text-primary">
+                         <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center text-3xl font-mono font-bold text-foreground animate-pulse">
                             {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
                         </div>
                     </div>
