@@ -54,7 +54,8 @@ export default function AdminApprovalsPage() {
                 schema: 'public',
                 table: 'investments'
             }, (payload) => {
-                fetchApprovals(); // Refetch on any change
+                // Refetch approvals when a change occurs
+                fetchApprovals();
             })
             .subscribe();
 
@@ -68,8 +69,8 @@ export default function AdminApprovalsPage() {
         startTransition(async () => {
             try {
                 await processApproval(approval.id, newStatus, approval.screenshot_url);
-                toast({ title: `Submission ${newStatus}` });
-                // The realtime subscription will automatically refresh the list
+                toast({ title: `Submission ${newStatus}`, description: `The request has been successfully ${newStatus}.` });
+                // The realtime subscription will automatically refresh the list, so no manual state update is needed here.
             } catch (error: any) {
                 toast({ variant: 'destructive', title: 'Error updating status', description: error.message });
             }

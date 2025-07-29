@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -14,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Landmark, Users, TrendingUp, PiggyBank } from "lucide-react";
+import { Users, TrendingUp, PiggyBank } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { User } from "@supabase/supabase-js";
@@ -45,24 +46,33 @@ export default function DashboardPage() {
             const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
             setProfile(profileData);
 
-            // Fetch earning history (this is an example, you might need a dedicated table for this)
-            // For now, we'll simulate it based on approved withdrawals
-            const { data: withdrawalData } = await supabase.from('withdrawals').select('requested_at, amount, status').eq('user_id', user.id).eq('status', 'approved');
-            
-            const history: EarningHistory[] = withdrawalData?.map(w => ({
-                id: Math.random(),
-                description: `Withdrawal (${w.status})`,
-                amount: w.amount,
-                created_at: w.requested_at
-            })) ?? [];
-            setEarningHistory(history);
+            // Fetch earning history
+            const { data: historyData } = await supabase
+                .from('earning_history')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false });
 
+            setEarningHistory(historyData ?? []);
         }
         setLoading(false);
     }
 
     useEffect(() => {
         fetchData();
+
+        const channel = supabase.channel('dashboard-realtime')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload) => {
+                fetchData();
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'earning_history' }, (payload) => {
+                fetchData();
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, []);
 
 
@@ -86,7 +96,7 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent>
                     <div className="text-3xl font-bold">{profile?.total_earnings ?? 0} PKR</div>
-                    <p className="text-xs text-accent-foreground/80">Includes referral bonuses</p>
+                    <p className="text-xs text-accent-foreground/80">Includes referral bonuses & daily credits</p>
                 </CardContent>
             </Card>
              <Card className="bg-secondary">

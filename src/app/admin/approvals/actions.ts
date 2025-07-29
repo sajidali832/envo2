@@ -19,11 +19,11 @@ export async function processApproval(investmentId: number, newStatus: 'approved
     // 2. Delete screenshot from storage using the admin client
     if (screenshotUrl) {
         try {
-            const urlParts = screenshotUrl.split('/');
-            const fileName = urlParts[urlParts.length - 1];
-            const filePath = `screenshots/${fileName}`;
+            // Extract the file path from the full URL
+            const url = new URL(screenshotUrl);
+            const filePath = url.pathname.split('/object/public/')[1];
             
-            if (fileName) {
+            if (filePath) {
                 const { error: storageError } = await supabaseAdmin.storage
                     .from('investments')
                     .remove([filePath]);
