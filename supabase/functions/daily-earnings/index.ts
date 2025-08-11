@@ -31,16 +31,18 @@ serve(async (_req) => {
 
     for (const profile of profiles) {
       let dailyEarning = 0;
+      // Plan-based earnings
       switch (profile.plan) {
         case 'basic':
-          dailyEarning = 100;
+          dailyEarning = 100; // Example for basic plan
           break;
         case 'standard':
-          dailyEarning = 250;
+          dailyEarning = 250; // Example for standard plan
           break;
         case 'premium':
-          dailyEarning = 600;
-          break;
+            dailyEarning = 600; // Example for premium plan
+            break;
+        // 'free' or other plans get 0
       }
 
       if (dailyEarning > 0) {
@@ -61,8 +63,8 @@ serve(async (_req) => {
 
     // 2. Batch update profiles with new earnings
     if (profilesToUpdate.length > 0) {
-      // Supabase does not support batch updates via `in` directly in JS client for RLS bypass.
-      // We must loop, but it's fine for this function context.
+      // Supabase JS client doesn't support bulk updates returning data, so we loop.
+      // This is acceptable within a serverless function context.
       for(const update of profilesToUpdate) {
           const { error: updateError } = await supabase
             .from('profiles')
