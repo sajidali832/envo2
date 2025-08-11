@@ -7,14 +7,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Trash2, Edit } from "lucide-react";
+import { MoreHorizontal, Ban, Edit, MapPin } from "lucide-react";
 import { useEffect, useState, useCallback, useTransition } from "react";
-import { supabase, supabaseAdmin } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { updateUserBalance } from "./actions";
+import { Badge } from "@/components/ui/badge";
+import { updateUserBalance, toggleUserBlock } from "./actions";
 
 type User = {
     id: string;
@@ -23,6 +23,11 @@ type User = {
     created_at: string;
     total_earnings: number;
     total_referrals: number;
+    status: 'active' | 'blocked';
+    location: {
+        type: 'Point',
+        coordinates: [number, number]
+    } | null;
 };
 
 export default function AdminUsersPage() {
@@ -35,15 +40,15 @@ export default function AdminUsersPage() {
     const [dataVersion, setDataVersion] = useState(0); 
     const { toast } = useToast();
 
-    const forceRefresh = () => {
+    const forceRefresh = useCallback(() => {
         setDataVersion(v => v + 1);
-    };
+    }, []);
 
     const fetchUsers = useCallback(async () => {
         setLoading(true);
         const { data, error } = await supabase
             .from('profiles')
-            .select('*, user_email:users(email)') // Fetch email from auth.users table
+            .select('*, user_email:users(email)')
             .order('created_at', { ascending: false });
         
         if (error) {
@@ -106,19 +111,14 @@ export default function AdminUsersPage() {
         setNewBalance(value === '' ? '' : Number(value));
     };
 
-    const handleDeleteUser = async (userId: string) => {
-        if (!supabaseAdmin) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Admin client not available. Check server configuration.' });
-            return;
-        }
-        
-        const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
-
-        if (error) {
-             toast({ variant: 'destructive', title: 'Error deleting user', description: error.message });
-        } else {
-            toast({ title: 'User has been permanently deleted' });
+    const handleBlockUser = async (user: User) => {
+        const newStatus = user.status === 'blocked' ? 'active' : 'blocked';
+        try {
+            await toggleUserBlock(user.id, newStatus);
+            toast({ title: `User has been ${newStatus}`});
             forceRefresh();
+        } catch (error: any) {
+             toast({ variant: 'destructive', title: `Error ${newStatus === 'blocked' ? 'blocking' : 'unblocking'} user`, description: error.message });
         }
     };
     
@@ -130,6 +130,12 @@ export default function AdminUsersPage() {
         }
     }
 
+    const getLocationLink = (location: User['location']) => {
+        if (!location?.coordinates) return '#';
+        const [long, lat] = location.coordinates;
+        return `https://www.google.com/maps?q=${lat},${long}`;
+    }
+
     return (
         <>
             <AdminDashboardHeader title="User Management" onRefresh={forceRefresh} />
@@ -138,7 +144,7 @@ export default function AdminUsersPage() {
                     <CardHeader className="flex flex-row items-center justify-between">
                         <div>
                             <CardTitle>All Users</CardTitle>
-                            <CardDescription>View, edit, or delete user information.</CardDescription>
+                            <CardDescription>View, edit, or block user information.</CardDescription>
                         </div>
                     </CardHeader>
                     <CardContent>
@@ -148,7 +154,7 @@ export default function AdminUsersPage() {
                                    <TableHead>User ID</TableHead>
                                    <TableHead>Name</TableHead>
                                    <TableHead>Email</TableHead>
-                                   <TableHead>Join Date</TableHead>
+                                   <TableHead>Status</TableHead>
                                    <TableHead>Total Earnings</TableHead>
                                    <TableHead>Referrals</TableHead>
                                    <TableHead className="text-right">Actions</TableHead>
@@ -168,47 +174,35 @@ export default function AdminUsersPage() {
                                         </TableCell>
                                     </TableRow>
                                 ) : users.map((user) => (
-                                   <TableRow key={user.id}>
+                                   <TableRow key={user.id} className={user.status === 'blocked' ? 'bg-destructive/10' : ''}>
                                        <TableCell className="font-medium truncate max-w-[150px]">{user.id}</TableCell>
                                        <TableCell>{user.full_name}</TableCell>
                                        <TableCell>{user.email}</TableCell>
-                                       <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
+                                       <TableCell>
+                                            <Badge variant={user.status === 'blocked' ? 'destructive' : 'default'}>
+                                                {user.status === 'blocked' ? 'Blocked' : 'Active'}
+                                            </Badge>
+                                       </TableCell>
                                        <TableCell>{user.total_earnings} PKR</TableCell>
                                        <TableCell className="text-center">{user.total_referrals}</TableCell>
                                        <TableCell className="text-right">
-                                            <AlertDialog>
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" size="icon">
-                                                            <MoreHorizontal className="h-4 w-4" />
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end">
-                                                        <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleEditClick(user);}}>
-                                                            <Edit className="mr-2 h-4 w-4" />
-                                                            Edit User
-                                                        </DropdownMenuItem>
-                                                        <AlertDialogTrigger asChild>
-                                                            <DropdownMenuItem className="text-red-600 focus:text-red-600 focus:bg-red-100">
-                                                                <Trash2 className="mr-2 h-4 w-4" />
-                                                                Delete User
-                                                            </DropdownMenuItem>
-                                                        </AlertDialogTrigger>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader>
-                                                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                                        <AlertDialogDescription>
-                                                            This action cannot be undone. This will permanently delete the user's account and remove their data from our servers.
-                                                        </AlertDialogDescription>
-                                                    </AlertDialogHeader>
-                                                    <AlertDialogFooter>
-                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                        <AlertDialogAction onClick={() => handleDeleteUser(user.id)} className="bg-destructive hover:bg-destructive/90">Continue</AlertDialogAction>
-                                                    </AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="icon">
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleEditClick(user);}}>
+                                                        <Edit className="mr-2 h-4 w-4" />
+                                                        Edit User
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onSelect={() => handleBlockUser(user)} className={user.status === 'blocked' ? 'text-green-600 focus:text-green-600' : 'text-red-600 focus:text-red-600'}>
+                                                        <Ban className="mr-2 h-4 w-4" />
+                                                        {user.status === 'blocked' ? 'Unblock User' : 'Block User'}
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                        </TableCell>
                                    </TableRow>
                                ))}
@@ -225,17 +219,19 @@ export default function AdminUsersPage() {
                     </DialogHeader>
                     {editingUser && (
                         <div className="grid gap-4 py-4">
-                            <div className="space-y-1">
-                                <Label className="text-muted-foreground">User ID</Label>
-                                <p className="text-sm font-mono">{editingUser.id}</p>
-                            </div>
                              <div className="space-y-1">
                                 <Label className="text-muted-foreground">Email</Label>
                                 <p className="text-sm">{editingUser.email}</p>
                             </div>
-                             <div className="space-y-1">
-                                <Label className="text-muted-foreground">Join Date</Label>
-                                <p className="text-sm">{new Date(editingUser.created_at).toLocaleString()}</p>
+                            <div className="space-y-1">
+                                <Label className="text-muted-foreground flex items-center gap-1"><MapPin className="h-3 w-3" /> Location</Label>
+                                {editingUser.location ? (
+                                    <a href={getLocationLink(editingUser.location)} target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline">
+                                        View on Map ({editingUser.location.coordinates[1].toFixed(4)}, {editingUser.location.coordinates[0].toFixed(4)})
+                                    </a>
+                                ) : (
+                                    <p className="text-sm text-muted-foreground">Not available</p>
+                                )}
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4 pt-4">
                                 <Label htmlFor="balance" className="text-right col-span-1">Balance (PKR)</Label>
